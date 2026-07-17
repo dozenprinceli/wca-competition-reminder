@@ -1,0 +1,53 @@
+timezone = "Asia/Shanghai"
+state_path = "state.sqlite3"
+lock_path = "runner.lock"
+log_dir = "logs"
+coordinate_retry_hours = 24
+full_reconcile_hours = 24
+max_emails_per_run = 100
+
+[wca]
+base_url = "https://www.worldcubeassociation.org"
+user_agent = "wca-competition-reminder/0.1 (contact: replace-with-your-email@example.com)"
+page_size = 100
+connect_timeout_seconds = 5
+read_timeout_seconds = 20
+request_attempts = 3
+overlap_days = 2
+
+[smtp]
+host = "smtp.163.com"
+port = 465
+security = "tls" # "starttls" (587) or "tls" (465)
+username = "replace-with-your-address@163.com"
+from_address = "replace-with-your-address@163.com"
+from_name = "WCA Competition Reminder"
+timeout_seconds = 30
+password_env = "WCA_REMINDER_SMTP_PASSWORD"
+
+[[admins]]
+username = "admin"
+# Store a unique strong password here and protect config.toml with owner-only permissions.
+password = "replace-with-a-strong-admin-password"
+
+# Add more [[admins]] tables as needed. Usernames must be unique.
+
+[[recipients]]
+name = "Example recipient"
+email = "recipient@example.com"
+# Coordinates are optional. Set both values or omit both; missing distance is shown as "-".
+latitude = 31.2304
+longitude = 121.4737
+# Optional positive radius in kilometers. Omit it to receive matching competitions anywhere.
+max_distance_km = 300
+# Comma-separated WCA event IDs, for example "333,minx,pyram".
+# Empty or omitted means all 17 official events.
+events = ""
+# Exact WCA English country/region names, for example "Hong Kong, China".
+countries = []
+# Values should match the current WCA country/continent catalog.
+continents = []
+# Countries and continents form a union. If both lists are empty or omitted, all regions match.
+
+# Add more [[recipients]] tables as needed. Each message is sent separately.
+# This section may be removed when recipients are managed through the browser subscription desk.

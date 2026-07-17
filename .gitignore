@@ -1,0 +1,13 @@
+.idea/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+*.sqlite3
+*.sqlite3-*
+config.toml
+smtp_password
+runner.lock
+logs/
+.env

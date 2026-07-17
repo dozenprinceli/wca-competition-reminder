@@ -1,0 +1,91 @@
+from dataclasses import replace
+from datetime import UTC, datetime
+
+import pytest
+
+from tests.conftest import make_config, make_details
+from wca_competition_reminder.config import RecipientConfig
+from wca_competition_reminder.distance import haversine_km
+from wca_competition_reminder.email_content import build_delivery_drafts
+
+
+def test_haversine_same_point_is_zero() -> None:
+    assert haversine_km(0, 0, 0, 0) == 0
+
+
+def test_haversine_shanghai_to_beijing() -> None:
+    assert haversine_km(31.2304, 121.4737, 39.9042, 116.4074) == pytest.approx(1067.3, abs=1)
+
+
+def test_haversine_handles_antipodal_points() -> None:
+    assert haversine_km(0, 0, 0, 180) == pytest.approx(20015.1, abs=0.2)
+
+
+def test_distance_filter_includes_exact_boundary_and_rejects_beyond_it() -> None:
+    distance = haversine_km(31.2304, 121.4737, 39.9042, 116.4074)
+    recipient = RecipientConfig(
+        "one@example.com",
+        31.2304,
+        121.4737,
+        max_distance_km=distance,
+    )
+
+    assert recipient.follows_distance(39.9042, 116.4074)
+    assert not replace(recipient, max_distance_km=distance - 0.01).follows_distance(
+        39.9042, 116.4074
+    )
+    assert not recipient.follows_distance(None, None)
+
+
+def test_email_is_personalized_and_html_escaped(tmp_path) -> None:
+    config = make_config(tmp_path)
+    details = make_details("Safe2026")
+    details = replace(
+        details,
+        venue="<Unsafe & venue>",
+        announced_at=datetime(2026, 7, 16, tzinfo=UTC),
+    )
+
+    drafts = build_delivery_drafts(
+        details,
+        config.recipients,
+        from_address=config.smtp.from_address,
+        distance_available=True,
+    )
+
+    assert len(drafts) == 2
+    assert "0.0 km" in drafts[0].text_body
+    assert "1067" in drafts[1].text_body
+    assert "三阶魔方 (333)、五魔方 (minx)" in drafts[0].text_body
+    assert "&lt;Unsafe &amp; venue&gt;" in drafts[0].html_body
+    assert drafts[0].message_id != drafts[1].message_id
+
+
+def test_degraded_email_has_no_distance(tmp_path) -> None:
+    config = make_config(tmp_path)
+    details = make_details("NoCoordinates2026", latitude=None, longitude=None)
+
+    draft = build_delivery_drafts(
+        details,
+        config.recipients[:1],
+        from_address=config.smtp.from_address,
+        distance_available=False,
+    )[0]
+
+    assert "直线（大圆）距离：-" in draft.text_body
+    assert "暂不可用" in draft.text_body
+
+
+def test_email_uses_dash_when_recipient_coordinates_are_empty(tmp_path) -> None:
+    config = make_config(tmp_path)
+    recipient = replace(config.recipients[0], latitude=None, longitude=None)
+
+    draft = build_delivery_drafts(
+        make_details("NoRecipientCoordinates2026"),
+        (recipient,),
+        from_address=config.smtp.from_address,
+        distance_available=True,
+    )[0]
+
+    assert "比赛坐标：31.230400, 121.473700" in draft.text_body
+    assert "直线（大圆）距离：-" in draft.text_body

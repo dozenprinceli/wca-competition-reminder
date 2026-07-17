@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#11191f" />
+    <meta name="application-base-path" content="__WCA_APPLICATION_BASE_PATH__" />
+    <title>WCA 赛事提醒台 | 管理控制台</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="__WCA_APPLICATION_BASE_PATH__/admin.css" />
+    <script src="__WCA_APPLICATION_BASE_PATH__/admin.js" defer></script>
+  </head>
+  <body>
+    <main class="auth-shell" id="auth-view">
+      <section class="auth-panel" aria-labelledby="auth-title">
+        <div class="auth-brand">
+          <span class="brand-block" aria-hidden="true">WCA</span>
+          <div>
+            <p class="mono-label">COMPETITION SIGNAL / OPS</p>
+            <p class="brand-title">赛事提醒台</p>
+          </div>
+        </div>
+        <div class="auth-heading">
+          <span class="auth-index" aria-hidden="true">A/01</span>
+          <div>
+            <p class="mono-label">RESTRICTED ACCESS</p>
+            <h1 id="auth-title">管理员验证</h1>
+          </div>
+        </div>
+        <form id="login-form" class="login-form" novalidate>
+          <label class="control">
+            <span>用户名</span>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              autocomplete="username"
+              maxlength="160"
+              required
+            />
+          </label>
+          <label class="control">
+            <span>密码</span>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              maxlength="1024"
+              required
+            />
+          </label>
+          <label class="password-toggle">
+            <input id="show-password" type="checkbox" />
+            <span class="toggle-box" aria-hidden="true">✓</span>
+            <span>显示密码</span>
+          </label>
+          <p class="form-message" id="login-message" role="alert" aria-live="polite"></p>
+          <button class="primary-command" id="login-button" type="submit">
+            <span>进入控制台</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </form>
+        <footer class="auth-footer">
+          <span class="live-mark"><i aria-hidden="true"></i> ADMIN GATEWAY</span>
+          <span>REMINDER 0.1</span>
+        </footer>
+      </section>
+    </main>
+
+    <div class="admin-shell" id="admin-view" hidden>
+      <aside class="side-rail">
+        <a
+          class="rail-brand"
+          href="__WCA_APPLICATION_BASE_PATH__/"
+          aria-label="返回赛事提醒台"
+        >
+          <span class="brand-block" aria-hidden="true">WCA</span>
+          <span>
+            <b>赛事提醒台</b>
+            <small>OPERATIONS</small>
+          </span>
+        </a>
+        <div class="rail-live">
+          <i aria-hidden="true"></i>
+          <span>管理通道在线</span>
+          <b>LIVE</b>
+        </div>
+        <nav class="admin-nav" aria-label="管理数据" role="tablist">
+          <button class="nav-item is-active" type="button" role="tab" aria-selected="true" data-view="overview">
+            <span>01</span><b>运行概览</b><i aria-hidden="true">↗</i>
+          </button>
+          <button class="nav-item" type="button" role="tab" aria-selected="false" data-view="subscribers">
+            <span>02</span><b>订阅用户</b><i id="nav-subscriber-count">0</i>
+          </button>
+          <button class="nav-item" type="button" role="tab" aria-selected="false" data-view="competitions">
+            <span>03</span><b>比赛数据</b><i id="nav-competition-count">0</i>
+          </button>
+          <button class="nav-item" type="button" role="tab" aria-selected="false" data-view="deliveries">
+            <span>04</span><b>投递记录</b><i id="nav-delivery-count">0</i>
+          </button>
+        </nav>
+        <div class="rail-account">
+          <p class="mono-label">SIGNED IN AS</p>
+          <strong id="admin-username">—</strong>
+          <button id="logout-button" type="button">退出登录</button>
+        </div>
+      </aside>
+
+      <main class="admin-workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="mono-label">SYSTEM DESK / <span id="view-index">01</span></p>
+            <h1 id="view-title">运行概览</h1>
+          </div>
+          <div class="header-tools">
+            <div class="sync-time">
+              <span>最近同步</span>
+              <time id="last-updated">—</time>
+            </div>
+            <button class="icon-command" id="refresh-button" type="button" title="刷新数据" aria-label="刷新数据">↻</button>
+          </div>
+        </header>
+
+        <div class="load-banner" id="load-banner" role="status" aria-live="polite">
+          <span class="load-track"><i></i></span>
+          <span id="load-message">正在读取管理数据</span>
+        </div>
+
+        <section class="admin-section" id="overview-section" role="tabpanel" data-section="overview">
+          <div class="metric-band" aria-label="核心状态">
+            <article class="metric metric-primary">
+              <div class="metric-label"><span>有效收件人</span><i class="status-light" aria-hidden="true"></i></div>
+              <strong id="metric-subscribers">—</strong>
+              <small id="metric-subscriber-note">等待数据</small>
+            </article>
+            <article class="metric">
+              <div class="metric-label"><span>比赛记录</span><b>ALL</b></div>
+              <strong id="metric-competitions">—</strong>
+              <small id="metric-competition-note">等待数据</small>
+            </article>
+            <article class="metric">
+              <div class="metric-label"><span>待投递</span><b>QUEUE</b></div>
+              <strong id="metric-queue">—</strong>
+              <small id="metric-queue-note">等待数据</small>
+            </article>
+            <article class="metric">
+              <div class="metric-label"><span>投递成功率</span><b>RATE</b></div>
+              <strong id="metric-success-rate">—</strong>
+              <span class="metric-bar" aria-hidden="true"><i id="success-rate-bar"></i></span>
+            </article>
+            <article class="metric metric-alert">
+              <div class="metric-label"><span>阻塞投递</span><b>ALERT</b></div>
+              <strong id="metric-blocked">—</strong>
+              <small id="metric-blocked-note">等待数据</small>
+            </article>
+          </div>
+
+          <div class="overview-grid">
+            <section class="status-panel" aria-labelledby="checkpoint-title">
+              <div class="section-heading">
+                <div>
+                  <p class="mono-label">PROCESS CHECKPOINTS</p>
+                  <h2 id="checkpoint-title">运行检查点</h2>
+                </div>
+                <span class="section-code">A / 03</span>
+              </div>
+              <div class="checkpoint-list" id="checkpoint-list"></div>
+            </section>
+
+            <section class="status-panel" aria-labelledby="distribution-title">
+              <div class="section-heading">
+                <div>
+                  <p class="mono-label">DELIVERY DISTRIBUTION</p>
+                  <h2 id="distribution-title">投递分布</h2>
+                </div>
+                <span class="section-code">B / 04</span>
+              </div>
+              <div class="distribution-list" id="delivery-distribution"></div>
+            </section>
+          </div>
+
+          <section class="data-panel issue-panel" aria-labelledby="issue-title">
+            <div class="section-heading">
+              <div>
+                <p class="mono-label">LATEST EXCEPTIONS</p>
+                <h2 id="issue-title">最近异常</h2>
+              </div>
+              <span class="section-code" id="issue-count">0 ITEMS</span>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>来源</th><th>对象</th><th>状态</th><th>错误</th><th>时间</th></tr></thead>
+                <tbody id="issue-rows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="admin-section" id="subscribers-section" role="tabpanel" data-section="subscribers" hidden>
+          <section class="data-panel" aria-labelledby="subscriber-title">
+            <div class="section-heading table-heading">
+              <div>
+                <p class="mono-label">RECIPIENT DIRECTORY</p>
+                <h2 id="subscriber-title">订阅用户</h2>
+              </div>
+              <div class="table-tools">
+                <label class="search-control">
+                  <span class="sr-only">搜索订阅用户</span>
+                  <input id="subscriber-search" type="search" placeholder="搜索姓名或邮箱" autocomplete="off" />
+                </label>
+                <label class="select-control">
+                  <span class="sr-only">筛选订阅状态</span>
+                  <select id="subscriber-filter">
+                    <option value="all">全部状态</option>
+                    <option value="active">活动中</option>
+                    <option value="inactive">已取消</option>
+                    <option value="config">配置文件</option>
+                  </select>
+                </label>
+                <span class="result-count" id="subscriber-result-count">0 条</span>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table class="wide-table">
+                <thead><tr><th>用户</th><th>来源</th><th>状态</th><th>项目 / 地区</th><th>距离</th><th>更新时间</th></tr></thead>
+                <tbody id="subscriber-rows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="admin-section" id="competitions-section" role="tabpanel" data-section="competitions" hidden>
+          <section class="data-panel" aria-labelledby="competition-title">
+            <div class="section-heading table-heading">
+              <div>
+                <p class="mono-label">WCA DATA INDEX</p>
+                <h2 id="competition-title">比赛数据</h2>
+              </div>
+              <div class="table-tools">
+                <label class="search-control">
+                  <span class="sr-only">搜索比赛</span>
+                  <input id="competition-search" type="search" placeholder="搜索比赛、城市或 ID" autocomplete="off" />
+                </label>
+                <label class="select-control">
+                  <span class="sr-only">筛选比赛状态</span>
+                  <select id="competition-filter"><option value="all">全部状态</option></select>
+                </label>
+                <span class="result-count" id="competition-result-count">0 条</span>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table class="wide-table">
+                <thead><tr><th>比赛</th><th>日期</th><th>地点</th><th>状态</th><th>项目</th><th>发现时间</th></tr></thead>
+                <tbody id="competition-rows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="admin-section" id="deliveries-section" role="tabpanel" data-section="deliveries" hidden>
+          <section class="data-panel" aria-labelledby="delivery-title">
+            <div class="section-heading table-heading">
+              <div>
+                <p class="mono-label">MAIL DELIVERY LEDGER</p>
+                <h2 id="delivery-title">投递记录</h2>
+              </div>
+              <div class="table-tools">
+                <label class="search-control">
+                  <span class="sr-only">搜索投递记录</span>
+                  <input id="delivery-search" type="search" placeholder="搜索邮箱、比赛或主题" autocomplete="off" />
+                </label>
+                <label class="select-control">
+                  <span class="sr-only">筛选投递状态</span>
+                  <select id="delivery-filter">
+                    <option value="all">全部状态</option>
+                    <option value="pending">待投递</option>
+                    <option value="sending">投递中</option>
+                    <option value="sent">已发送</option>
+                    <option value="blocked">已阻塞</option>
+                  </select>
+                </label>
+                <span class="result-count" id="delivery-result-count">0 条</span>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table class="wide-table">
+                <thead><tr><th>收件人</th><th>比赛</th><th>状态</th><th>尝试</th><th>创建时间</th><th>完成 / 下次尝试</th></tr></thead>
+                <tbody id="delivery-rows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <footer class="workspace-footer">
+          <span>WCA COMPETITION REMINDER</span>
+          <span id="timezone-label">TIMEZONE —</span>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>
