@@ -302,6 +302,50 @@ h1 em {
   text-align: right;
 }
 
+.language-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.language-switch {
+  display: inline-flex;
+  border: 1px solid var(--line);
+}
+
+.language-button {
+  min-width: 40px;
+  min-height: 27px;
+  padding: 0 8px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-family: "Space Mono", "Cascadia Mono", monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.language-button + .language-button {
+  border-left: 1px solid var(--line);
+}
+
+.language-button:hover,
+.language-button:focus-visible {
+  color: var(--ink);
+  background: var(--paper-deep);
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.language-button.is-active {
+  color: var(--paper);
+  background: var(--ink);
+}
+
 .topbar-meta time {
   color: var(--ink);
   font-family: "Space Mono", "Cascadia Mono", monospace;
