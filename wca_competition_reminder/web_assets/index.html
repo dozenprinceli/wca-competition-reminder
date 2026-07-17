@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#11191f" />
     <meta name="application-base-path" content="__WCA_APPLICATION_BASE_PATH__" />
-    <title data-i18n="pageTitle">WCA 比赛提醒 | 邮件订阅</title>
+    <title data-i18n="pageTitle">WCA 比赛公示提醒 | 邮件订阅</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="__WCA_APPLICATION_BASE_PATH__/styles.css" />
     <script src="__WCA_APPLICATION_BASE_PATH__/app.js" defer></script>
@@ -17,7 +17,7 @@
           <div class="brand-mark" aria-hidden="true">WCA</div>
           <div>
             <p class="brand-kicker">COMPETITION SIGNAL</p>
-            <p class="brand-name" data-i18n="brandName">赛事提醒台</p>
+            <p class="brand-name" data-i18n="brandName">比赛公示提醒</p>
           </div>
         </div>
 
@@ -30,7 +30,7 @@
         <nav class="mode-nav" aria-label="订阅模式" data-i18n-aria-label="subscriptionMode" role="tablist">
           <button class="mode-button is-active" type="button" role="tab" aria-selected="true" data-mode="register">
             <span class="mode-index">01</span>
-            <span data-i18n="modeRegisterLabel">注册订阅</span>
+            <span data-i18n="modeRegisterLabel">注册公示提醒</span>
             <span class="mode-symbol" aria-hidden="true">↗</span>
           </button>
           <button class="mode-button" type="button" role="tab" aria-selected="false" data-mode="modify">
@@ -48,7 +48,7 @@
         <div class="rail-foot">
           <div class="rail-rule"></div>
           <p class="rail-foot-label">WCA / UPCOMING</p>
-          <p class="rail-foot-copy" data-i18n="railFootCopy">只接收你真正关注的比赛。邮箱是订阅的唯一标识，设置随时可以改。</p>
+          <p class="rail-foot-copy" data-i18n="railFootCopy">这里注册的是 WCA 比赛公示提醒服务，不是比赛报名。新比赛公示后，提醒会发送到你的邮箱。</p>
           <span class="rail-version">REMINDER 0.1</span>
         </div>
       </aside>
@@ -57,7 +57,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">NOTIFICATION DESK / 01</p>
-            <h1><span data-i18n="heroLine1">把下一场比赛</span><br /><em data-i18n="heroLine2">留在视线里。</em></h1>
+            <h1><span data-i18n="heroLine1">订阅 WCA 比赛</span><br /><em data-i18n="heroLine2">公示提醒邮件。</em></h1>
           </div>
           <div class="topbar-meta" aria-label="当前时间" data-i18n-aria-label="currentTime">
             <div class="language-row">
@@ -79,8 +79,8 @@
               <div class="panel-number" aria-hidden="true">01</div>
               <div>
                 <p class="panel-kicker" id="form-kicker">NEW CHANNEL</p>
-                <h2 id="form-title">注册邮件提醒</h2>
-                <p class="panel-description" id="form-description">验证邮箱，设置你的比赛提醒范围。</p>
+                <h2 id="form-title">注册比赛公示提醒</h2>
+                <p class="panel-description" id="form-description">这里注册的是提醒服务，不是比赛报名。WCA 公示符合你筛选条件的新比赛后，我们会发送邮件提醒。</p>
               </div>
             </div>
 
@@ -88,7 +88,7 @@
               <label class="field field-wide">
                 <span class="field-label"><span data-i18n="emailLabel">邮箱地址</span> <b>*</b></span>
                 <input id="email" name="email" type="email" autocomplete="email" placeholder="example@email.com" required />
-                <span class="field-hint" id="email-hint">仅用于发送 WCA 比赛通知</span>
+                <span class="field-hint" id="email-hint">用于接收比赛公示提醒，也是订阅的唯一标识</span>
               </label>
               <div class="profile-fields" id="profile-fields">
                 <label class="field">
@@ -165,13 +165,13 @@
               <label class="consent-control" id="notification-consent-field">
                 <input id="notification-consent" name="notification_consent" type="checkbox" />
                 <span class="consent-mark" aria-hidden="true">✓</span>
-                <span class="consent-copy" data-i18n="consent">我同意接收 WCA 比赛通知邮件</span>
+                <span class="consent-copy" data-i18n="consent">我同意接收 WCA 比赛公示提醒邮件</span>
               </label>
               <div class="form-actions">
                 <button class="button button-quiet" id="reset-button" type="button">清空</button>
                 <button class="button button-primary" id="submit-button" type="submit">
                   <span id="submit-symbol" aria-hidden="true">↗</span>
-                  <span id="submit-label">建立提醒</span>
+                  <span id="submit-label">订阅公示提醒</span>
                 </button>
               </div>
             </div>
