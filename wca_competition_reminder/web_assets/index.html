@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#11191f" />
     <meta name="application-base-path" content="__WCA_APPLICATION_BASE_PATH__" />
+    <meta name="google-maps-api-key" content="__WCA_GOOGLE_MAPS_API_KEY__" />
     <title data-i18n="pageTitle">WCA 比赛公示提醒 | 邮件订阅</title>
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="__WCA_APPLICATION_BASE_PATH__/styles.css" />
-    <script src="__WCA_APPLICATION_BASE_PATH__/app.js" defer></script>
+    <style nonce="__WCA_CSP_NONCE__"></style>
+    <link rel="stylesheet" href="__WCA_APPLICATION_BASE_PATH__/styles.css" nonce="__WCA_CSP_NONCE__" />
+    <script src="__WCA_APPLICATION_BASE_PATH__/app.js" nonce="__WCA_CSP_NONCE__" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -96,16 +98,22 @@
                   <span class="field-label"><span data-i18n="nameLabel">称呼</span> <b>*</b></span>
                   <input id="name" name="name" type="text" autocomplete="name" maxlength="120" placeholder="例如：Alex" data-i18n-placeholder="namePlaceholder" />
                 </label>
-                <label class="field">
-                  <span class="field-label" data-i18n="latitudeLabel">纬度</span>
-                  <input id="latitude" name="latitude" type="number" min="-90" max="90" step="any" placeholder="31.2304" />
-                  <span class="field-hint" data-i18n="latitudeHint">可选，需与经度同时填写</span>
-                </label>
-                <label class="field">
-                  <span class="field-label" data-i18n="longitudeLabel">经度</span>
-                  <input id="longitude" name="longitude" type="number" min="-180" max="180" step="any" placeholder="121.4737" />
-                  <span class="field-hint" data-i18n="longitudeHint">留空时邮件中的距离显示为 -</span>
-                </label>
+                <div class="coordinate-fields">
+                  <label class="field">
+                    <span class="field-label" data-i18n="latitudeLabel">纬度</span>
+                    <input id="latitude" name="latitude" type="number" min="-90" max="90" step="any" placeholder="31.2304" />
+                    <span class="field-hint" data-i18n="latitudeHint">可选，需与经度同时填写</span>
+                  </label>
+                  <label class="field">
+                    <span class="field-label" data-i18n="longitudeLabel">经度</span>
+                    <input id="longitude" name="longitude" type="number" min="-180" max="180" step="any" placeholder="121.4737" />
+                    <span class="field-hint" data-i18n="longitudeHint">留空时邮件中的距离显示为 -</span>
+                  </label>
+                  <button class="location-picker-button" id="location-picker-button" type="button">
+                    <span class="location-picker-icon" aria-hidden="true">⌖</span>
+                    <span data-i18n="mapSelectButton">从 Google 地图选择</span>
+                  </button>
+                </div>
                 <label class="field">
                   <span class="field-label" data-i18n="distanceLabel">最远直线距离（km）</span>
                   <input id="max-distance-km" name="max_distance_km" type="number" min="0.000001" step="any" inputmode="decimal" placeholder="例如：300" data-i18n-placeholder="distancePlaceholder" />
@@ -204,6 +212,38 @@
             </section>
           </aside>
         </section>
+
+        <dialog class="location-dialog" id="location-dialog" aria-labelledby="location-dialog-title">
+          <div class="location-dialog-layout">
+            <header class="location-dialog-header">
+              <div>
+                <p class="panel-kicker">GEOPOINT PICKER</p>
+                <h2 id="location-dialog-title" data-i18n="mapDialogTitle">选择位置</h2>
+              </div>
+              <button class="location-dialog-close" id="location-dialog-close" type="button" aria-label="关闭地图" data-i18n-aria-label="mapCloseLabel">
+                <span aria-hidden="true">×</span>
+              </button>
+            </header>
+
+            <div class="location-map-frame">
+              <div class="location-map" id="location-map" role="region" aria-label="Google 地图位置选择器" data-i18n-aria-label="mapRegionLabel"></div>
+              <div class="location-map-status" id="location-map-status" role="status" data-i18n="mapLoading">正在加载 Google 地图…</div>
+            </div>
+
+            <div class="location-coordinate-readout" aria-live="polite">
+              <span data-i18n="mapSelectedLabel">待确认坐标</span>
+              <output id="location-selected-coordinates" data-i18n="mapNoSelection">尚未选择位置</output>
+            </div>
+
+            <footer class="location-dialog-footer">
+              <button class="button button-quiet" id="location-dialog-cancel" type="button" data-i18n="mapCancel">取消</button>
+              <button class="button button-primary" id="location-dialog-confirm" type="button" disabled>
+                <span aria-hidden="true">✓</span>
+                <span data-i18n="mapConfirm">确认位置</span>
+              </button>
+            </footer>
+          </div>
+        </dialog>
 
         <div class="toast" id="toast" role="status" aria-live="polite"></div>
       </main>

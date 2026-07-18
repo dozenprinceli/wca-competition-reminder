@@ -59,6 +59,36 @@ continents = ["Europe"]
     assert not config.recipients[0].follows_region("Japan", "Asia")
     assert config.wca.page_size == 100
     assert config.log_dir == (tmp_path / "logs").resolve()
+    assert config.google_maps_api_key is None
+
+
+def test_load_config_reads_optional_google_maps_api_key(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        """
+[web]
+google_maps_api_key = "  browser-test-key  "
+""",
+    )
+
+    config = load_config(config_path)
+
+    assert config.google_maps_api_key == "browser-test-key"
+
+
+def test_google_maps_api_key_must_be_a_string(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        """
+[web]
+google_maps_api_key = 123
+""",
+    )
+
+    with pytest.raises(ConfigurationError, match="google_maps_api_key must be a string"):
+        load_config(config_path)
 
 
 def test_load_config_reads_admin_list(tmp_path: Path) -> None:

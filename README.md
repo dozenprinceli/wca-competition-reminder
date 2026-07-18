@@ -20,8 +20,8 @@ it also includes the straight-line distance; otherwise the distance is shown as 
 - Supports all 17 official WCA events.
 - Gives every recipient independent event, country/region, continent, and optional distance
   filters.
-- Calculates great-circle distance locally from WCA coordinates; no maps API or token is
-  required.
+- Calculates great-circle distance locally from WCA coordinates. Distance calculation needs
+  no maps API; the browser map picker is an optional enhancement.
 - Persists discovery and delivery state in SQLite, with automatic retries for transient
   failures.
 - Establishes a silent baseline on first run, so existing competitions do not generate a
@@ -36,6 +36,8 @@ it also includes the straight-line distance; otherwise the distance is shown as 
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
 - An SMTP account with STARTTLS (usually port `587`) or implicit TLS (usually port `465`)
+- Optional: a Google Maps Platform browser API key with Maps JavaScript API enabled for the
+  location picker
 - Node.js and [PM2](https://pm2.keymetrics.io/) for the production deployment described below
 
 ## Quick Start
@@ -60,10 +62,14 @@ Edit `config.toml`. At minimum:
 3. Optionally add `[[recipients]]` entries for recipients managed in TOML. The list may be
    omitted when all recipients will use the browser subscription desk.
 4. Add at least one `[[admins]]` entry with a unique username and strong password.
+5. To enable Google Maps location selection, set a browser API key in `[web]`.
 
 See [`config.example.toml`](config.example.toml) for every available setting.
 
 ```toml
+[web]
+google_maps_api_key = "your-browser-api-key"
+
 [[admins]]
 username = "admin"
 password = "replace-with-a-strong-admin-password"
@@ -132,6 +138,13 @@ only subscription identifier: current settings, updates, and cancellation do not
 Recipient coordinates are optional and must either both be set or both be empty. An optional
 positive maximum distance requires coordinates. Cancellation blocks pending deliveries for
 that address. Changes apply to competitions that have not already been queued.
+
+When `[web].google_maps_api_key` is configured, the coordinate fields include a Google Maps
+picker. Clicking the map and confirming the selection fills both coordinates to six decimal
+places. Enable the [Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/cloud-setup)
+for the Google Cloud project, then apply [HTTP referrer and API restrictions](https://developers.google.com/maps/api-security-best-practices)
+for the deployed domains. Browser API keys are sent to clients and must not be treated as
+server-side secrets.
 
 The browser's country and continent choices are loaded from the WCA country catalog through
 the server-side `/api/options` endpoint and cached for six hours. Keep the Web service bound

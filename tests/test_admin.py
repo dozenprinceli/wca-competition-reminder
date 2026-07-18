@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from dataclasses import replace
 from datetime import timedelta
 from http.client import HTTPConnection, HTTPResponse
@@ -160,6 +161,11 @@ def test_forwarded_prefix_scopes_pages_and_admin_cookie(tmp_path: Path) -> None:
             'name="application-base-path" content="/wca-competition-reminder"'
             in page
         )
+        assert 'name="google-maps-api-key" content=""' in page
+        assert "__WCA_GOOGLE_MAPS_API_KEY__" not in page
+        assert "__WCA_CSP_NONCE__" not in page
+        assert page_response.getheader("Referrer-Policy") == "same-origin"
+        assert "googleapis.com" not in str(page_response.getheader("Content-Security-Policy"))
         assert 'href="/wca-competition-reminder/styles.css"' in page
         assert 'src="/wca-competition-reminder/app.js"' in page
 
@@ -183,6 +189,36 @@ def test_forwarded_prefix_scopes_pages_and_admin_cookie(tmp_path: Path) -> None:
         cookie_header = str(response.getheader("Set-Cookie"))
         assert "Path=/wca-competition-reminder/;" in cookie_header
         assert "Secure" in cookie_header
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_index_injects_escaped_google_maps_key_and_picker_markup(tmp_path: Path) -> None:
+    config = replace(make_config(tmp_path), google_maps_api_key='maps-key&"<')
+    server = web.create_server(config, port=0, verification_sender=lambda *_args: None)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request("GET", "/")
+        response = connection.getresponse()
+        page = response.read().decode("utf-8")
+
+        assert response.status == 200
+        assert 'name="google-maps-api-key" content="maps-key&amp;&quot;&lt;"' in page
+        assert 'id="location-picker-button"' in page
+        assert 'id="location-dialog"' in page
+        nonces = re.findall(r'nonce="([^"]+)"', page)
+        assert len(nonces) == 3
+        assert len(set(nonces)) == 1
+        content_security_policy = str(response.getheader("Content-Security-Policy"))
+        assert f"'nonce-{nonces[0]}'" in content_security_policy
+        assert "'strict-dynamic'" in content_security_policy
+        assert "https://*.googleapis.com" in content_security_policy
+        assert response.getheader("Referrer-Policy") == "strict-origin-when-cross-origin"
     finally:
         connection.close()
         server.shutdown()

@@ -91,6 +91,18 @@ const TRANSLATIONS = {
     distanceLabel: "最远直线距离（km）",
     distancePlaceholder: "例如：300",
     distanceHint: "可选；设置后经纬度必填",
+    mapSelectButton: "从 Google 地图选择",
+    mapDialogTitle: "选择位置",
+    mapCloseLabel: "关闭地图",
+    mapRegionLabel: "Google 地图位置选择器",
+    mapLoading: "正在加载 Google 地图…",
+    mapSelectedLabel: "待确认坐标",
+    mapNoSelection: "尚未选择位置",
+    mapCancel: "取消",
+    mapConfirm: "确认位置",
+    mapNotConfigured: "Google 地图尚未配置，请联系服务管理员。",
+    mapLoadFailure: "Google 地图加载失败，请稍后再试。",
+    mapSelectionSaved: "经纬度已从地图写入。",
     verificationLabel: "邮箱验证码",
     verificationPlaceholder: "6 位验证码",
     verificationHint: "验证码 5 分钟内有效",
@@ -205,6 +217,18 @@ const TRANSLATIONS = {
     distanceLabel: "Max straight-line distance (km)",
     distancePlaceholder: "e.g. 300",
     distanceHint: "Optional; latitude and longitude are required",
+    mapSelectButton: "Choose on Google Maps",
+    mapDialogTitle: "Choose a location",
+    mapCloseLabel: "Close map",
+    mapRegionLabel: "Google Maps location picker",
+    mapLoading: "Loading Google Maps…",
+    mapSelectedLabel: "Coordinates to confirm",
+    mapNoSelection: "No location selected",
+    mapCancel: "Cancel",
+    mapConfirm: "Confirm location",
+    mapNotConfigured: "Google Maps is not configured. Contact the service administrator.",
+    mapLoadFailure: "Google Maps could not be loaded. Try again later.",
+    mapSelectionSaved: "Coordinates copied from the map.",
     verificationLabel: "Email verification code",
     verificationPlaceholder: "6-digit code",
     verificationHint: "Code valid for 5 minutes",
@@ -319,6 +343,18 @@ const TRANSLATIONS = {
     distanceLabel: "最大直線距離（km）",
     distancePlaceholder: "例：300",
     distanceHint: "任意。設定する場合は緯度・経度が必要です",
+    mapSelectButton: "Google マップで選択",
+    mapDialogTitle: "場所を選択",
+    mapCloseLabel: "地図を閉じる",
+    mapRegionLabel: "Google マップの場所選択",
+    mapLoading: "Google マップを読み込んでいます…",
+    mapSelectedLabel: "確認する座標",
+    mapNoSelection: "場所が選択されていません",
+    mapCancel: "キャンセル",
+    mapConfirm: "この場所を確定",
+    mapNotConfigured: "Google マップが設定されていません。管理者にお問い合わせください。",
+    mapLoadFailure: "Google マップを読み込めませんでした。後でもう一度お試しください。",
+    mapSelectionSaved: "地図から緯度・経度を入力しました。",
     verificationLabel: "メール認証コード",
     verificationPlaceholder: "6桁の認証コード",
     verificationHint: "コードの有効期限は5分です",
@@ -422,6 +458,10 @@ const CHINESE_REGION_TIME_ZONES = new Set([
 const JAPANESE_REGION_TIME_ZONES = new Set(["Asia/Tokyo"]);
 const APPLICATION_BASE_PATH =
   document.querySelector('meta[name="application-base-path"]')?.content || "";
+const GOOGLE_MAPS_API_KEY =
+  document.querySelector('meta[name="google-maps-api-key"]')?.content.trim() || "";
+const GOOGLE_MAPS_CALLBACK_NAME = "__wcaCompetitionReminderGoogleMapsReady";
+const CSP_NONCE = document.querySelector("script[nonce]")?.nonce || "";
 
 function applicationUrl(path) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
@@ -498,6 +538,14 @@ const emailInput = document.querySelector("#email");
 const nameInput = document.querySelector("#name");
 const latitudeInput = document.querySelector("#latitude");
 const longitudeInput = document.querySelector("#longitude");
+const locationPickerButton = document.querySelector("#location-picker-button");
+const locationDialog = document.querySelector("#location-dialog");
+const locationDialogClose = document.querySelector("#location-dialog-close");
+const locationDialogCancel = document.querySelector("#location-dialog-cancel");
+const locationDialogConfirm = document.querySelector("#location-dialog-confirm");
+const locationMapElement = document.querySelector("#location-map");
+const locationMapStatus = document.querySelector("#location-map-status");
+const locationSelectedCoordinates = document.querySelector("#location-selected-coordinates");
 const maxDistanceInput = document.querySelector("#max-distance-km");
 const verificationCodeInput = document.querySelector("#verification-code");
 const notificationConsentInput = document.querySelector("#notification-consent");
@@ -515,6 +563,14 @@ const submitLabel = document.querySelector("#submit-label");
 const submitSymbol = document.querySelector("#submit-symbol");
 const toast = document.querySelector("#toast");
 const languageButtons = document.querySelectorAll(".language-button");
+
+let googleMapsPromise = null;
+let googleMapsRequestedLocale = null;
+let locationMap = null;
+let locationSelectionLayer = null;
+let locationSelectionFeature = null;
+let pendingLocation = null;
+let locationDialogGeneration = 0;
 
 class ApiError extends Error {
   constructor(message, status, body = {}) {
@@ -622,10 +678,22 @@ function applyModeCopy() {
 }
 
 function applyLanguage(language, { persist = true } = {}) {
-  state.language = normalizeLanguage(language) || "zh";
+  const nextLanguage = normalizeLanguage(language) || "zh";
+  const nextMapsLocale = googleMapsLocale(nextLanguage);
+  const mapsLocaleChanged =
+    googleMapsRequestedLocale &&
+    (googleMapsRequestedLocale.language !== nextMapsLocale.language ||
+      googleMapsRequestedLocale.region !== nextMapsLocale.region);
+
+  state.language = nextLanguage;
   if (persist) {
     persistLanguage(state.language);
     replaceLanguageQuery(state.language);
+  }
+  if (persist && mapsLocaleChanged) {
+    // Google Maps fixes its control language when the API script is loaded.
+    window.location.reload();
+    return;
   }
   document.documentElement.lang =
     state.language === "en" ? "en" : state.language === "ja" ? "ja" : "zh-CN";
@@ -638,6 +706,9 @@ function applyLanguage(language, { persist = true } = {}) {
   document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
     element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel));
   });
+  if (GOOGLE_MAPS_API_KEY) locationPickerButton.removeAttribute("title");
+  else locationPickerButton.setAttribute("title", t("mapNotConfigured"));
+  updateLocationSelectionDisplay();
   document.title = t("pageTitle");
   languageButtons.forEach((button) => {
     const active = button.dataset.language === state.language;
@@ -667,6 +738,219 @@ function showToast(message, isError = false, messageFactory = null) {
 function showTranslationToast(key, isError = false, variables = {}) {
   const messageFactory = () => t(key, variables);
   showToast(messageFactory(), isError, messageFactory);
+}
+
+function coordinatesFromInputs() {
+  const latitudeText = latitudeInput.value.trim();
+  const longitudeText = longitudeInput.value.trim();
+  if (!latitudeText || !longitudeText) return null;
+
+  const latitude = Number(latitudeText);
+  const longitude = Number(longitudeText);
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return null;
+  }
+  return { lat: latitude, lng: longitude };
+}
+
+function coordinateValue(value) {
+  const normalized = Math.abs(value) < 0.0000005 ? 0 : value;
+  return normalized.toFixed(6);
+}
+
+function formatLocationCoordinates(location) {
+  return `${coordinateValue(location.lat)}, ${coordinateValue(location.lng)}`;
+}
+
+function updateLocationSelectionDisplay() {
+  locationSelectedCoordinates.textContent = pendingLocation
+    ? formatLocationCoordinates(pendingLocation)
+    : t("mapNoSelection");
+  locationDialogConfirm.disabled = !pendingLocation;
+}
+
+function setLocationMapStatus(key, { error = false, hidden = false } = {}) {
+  locationMapStatus.dataset.i18n = key;
+  locationMapStatus.textContent = t(key);
+  locationMapStatus.classList.toggle("is-error", error);
+  locationMapStatus.classList.toggle("is-hidden", hidden);
+}
+
+function googleMapsLocale(language = state.language) {
+  if (language === "ja") return { language: "ja", region: "JP" };
+  if (language === "en") return { language: "en", region: "US" };
+  return { language: "zh-CN", region: "CN" };
+}
+
+function loadGoogleMaps() {
+  if (!GOOGLE_MAPS_API_KEY) return Promise.reject(new Error("google_maps_not_configured"));
+  if (window.google?.maps?.Map) return Promise.resolve(window.google.maps);
+  if (googleMapsPromise) return googleMapsPromise;
+
+  googleMapsPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    const locale = googleMapsLocale();
+    googleMapsRequestedLocale = locale;
+    const cleanupCallback = () => {
+      try {
+        delete window[GOOGLE_MAPS_CALLBACK_NAME];
+      } catch (_error) {
+        window[GOOGLE_MAPS_CALLBACK_NAME] = undefined;
+      }
+    };
+    const fail = () => {
+      cleanupCallback();
+      script.remove();
+      reject(new Error("google_maps_load_failed"));
+    };
+
+    window[GOOGLE_MAPS_CALLBACK_NAME] = () => {
+      const maps = window.google?.maps;
+      cleanupCallback();
+      if (maps?.Map) resolve(maps);
+      else fail();
+    };
+    script.id = "google-maps-api-script";
+    if (CSP_NONCE) script.nonce = CSP_NONCE;
+    script.async = true;
+    script.defer = true;
+    script.onerror = fail;
+    script.src = `https://maps.googleapis.com/maps/api/js?${new URLSearchParams({
+      key: GOOGLE_MAPS_API_KEY,
+      callback: GOOGLE_MAPS_CALLBACK_NAME,
+      loading: "async",
+      v: "weekly",
+      language: locale.language,
+      region: locale.region,
+    }).toString()}`;
+    document.head.append(script);
+  }).catch((error) => {
+    googleMapsPromise = null;
+    googleMapsRequestedLocale = null;
+    throw error;
+  });
+
+  return googleMapsPromise;
+}
+
+function syncLocationSelectionLayer() {
+  const maps = window.google?.maps;
+  if (!locationMap || !maps?.Data) return;
+  if (!locationSelectionLayer) {
+    locationSelectionLayer = new maps.Data({ map: locationMap });
+    locationSelectionLayer.setStyle({
+      icon: {
+        path: maps.SymbolPath.CIRCLE,
+        scale: 9,
+        fillColor: "#d6f36a",
+        fillOpacity: 1,
+        strokeColor: "#11191f",
+        strokeWeight: 2,
+      },
+    });
+  }
+  if (locationSelectionFeature) {
+    locationSelectionLayer.remove(locationSelectionFeature);
+    locationSelectionFeature = null;
+  }
+  if (!pendingLocation) return;
+  locationSelectionFeature = new maps.Data.Feature({
+    geometry: new maps.Data.Point(new maps.LatLng(pendingLocation.lat, pendingLocation.lng)),
+  });
+  locationSelectionLayer.add(locationSelectionFeature);
+}
+
+function selectMapLocation(location) {
+  const latitude = Number(location.lat);
+  const longitude = Number(location.lng);
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return;
+  }
+  pendingLocation = { lat: latitude, lng: longitude };
+  updateLocationSelectionDisplay();
+  syncLocationSelectionLayer();
+}
+
+function initializeLocationMap(maps) {
+  const existingLocation = pendingLocation;
+  const center = existingLocation || { lat: 31.2304, lng: 121.4737 };
+  if (!locationMap) {
+    locationMap = new maps.Map(locationMapElement, {
+      center,
+      zoom: existingLocation ? 12 : 3,
+      clickableIcons: false,
+      fullscreenControl: true,
+      mapTypeControl: false,
+      streetViewControl: false,
+    });
+    locationMap.addListener("click", (event) => {
+      if (!event.latLng) return;
+      selectMapLocation({ lat: event.latLng.lat(), lng: event.latLng.lng() });
+    });
+  } else {
+    locationMap.setCenter(center);
+    locationMap.setZoom(existingLocation ? 12 : 3);
+    maps.event.trigger(locationMap, "resize");
+  }
+  syncLocationSelectionLayer();
+}
+
+async function openLocationDialog() {
+  if (!GOOGLE_MAPS_API_KEY) {
+    showTranslationToast("mapNotConfigured", true);
+    return;
+  }
+
+  locationDialogGeneration += 1;
+  const generation = locationDialogGeneration;
+  pendingLocation = coordinatesFromInputs();
+  updateLocationSelectionDisplay();
+  setLocationMapStatus("mapLoading");
+  if (!locationDialog.open) locationDialog.showModal();
+  document.body.classList.add("modal-open");
+
+  try {
+    const maps = await loadGoogleMaps();
+    if (!locationDialog.open || generation !== locationDialogGeneration) return;
+    if (maps.importLibrary) await maps.importLibrary("maps");
+    if (!locationDialog.open || generation !== locationDialogGeneration) return;
+    initializeLocationMap(maps);
+    setLocationMapStatus("mapLoading", { hidden: true });
+  } catch (_error) {
+    if (!locationDialog.open || generation !== locationDialogGeneration) return;
+    setLocationMapStatus("mapLoadFailure", { error: true });
+  }
+}
+
+function closeLocationDialog() {
+  if (locationDialog.open) locationDialog.close();
+}
+
+function confirmLocationSelection() {
+  if (!pendingLocation) return;
+  latitudeInput.value = coordinateValue(pendingLocation.lat);
+  longitudeInput.value = coordinateValue(pendingLocation.lng);
+  [latitudeInput, longitudeInput].forEach((input) => {
+    input.removeAttribute("aria-invalid");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  closeLocationDialog();
+  showTranslationToast("mapSelectionSaved");
 }
 
 function showLocalizedToast(error, fallbackKey = "operationFailure") {
@@ -1211,6 +1495,19 @@ function bindEvents() {
   form.addEventListener("submit", submitForm);
   resetButton.addEventListener("click", resetForm);
   sendCodeButton.addEventListener("click", sendVerificationCode);
+  locationPickerButton.addEventListener("click", () => void openLocationDialog());
+  locationDialogClose.addEventListener("click", closeLocationDialog);
+  locationDialogCancel.addEventListener("click", closeLocationDialog);
+  locationDialogConfirm.addEventListener("click", confirmLocationSelection);
+  locationDialog.addEventListener("click", (event) => {
+    if (event.target === locationDialog) closeLocationDialog();
+  });
+  locationDialog.addEventListener("close", () => {
+    locationDialogGeneration += 1;
+    document.body.classList.remove("modal-open");
+    pendingLocation = null;
+    updateLocationSelectionDisplay();
+  });
   emailInput.addEventListener("change", () => {
     if (state.mode === "modify" && !state.subscriptionLoaded) {
       void loadSubscriptionForModify();

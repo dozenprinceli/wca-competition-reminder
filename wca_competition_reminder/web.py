@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from html import escape
 from http import HTTPStatus
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -45,6 +46,8 @@ ADMIN_LOGIN_ATTEMPTS = 5
 ADMIN_LOGIN_WINDOW_SECONDS = 5 * 60
 ADMIN_COOKIE_NAME = "wca_admin_session"
 APPLICATION_BASE_PATH_PLACEHOLDER = "__WCA_APPLICATION_BASE_PATH__"
+GOOGLE_MAPS_API_KEY_PLACEHOLDER = "__WCA_GOOGLE_MAPS_API_KEY__"
+CSP_NONCE_PLACEHOLDER = "__WCA_CSP_NONCE__"
 FORWARDED_PREFIX_PATTERN = re.compile(
     r"/(?:[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*)?"
 )
@@ -855,14 +858,27 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
         except OSError:
             self._send_error(HTTPStatus.NOT_FOUND, "not_found", "资源不存在")
             return
+        csp_nonce: str | None = None
         if path.suffix.casefold() == ".html":
+            if path.name == "index.html" and self._settings.config.google_maps_api_key:
+                csp_nonce = secrets.token_urlsafe(18)
             body = body.replace(
                 APPLICATION_BASE_PATH_PLACEHOLDER.encode("ascii"),
                 self._application_base_path().encode("ascii"),
             )
+            body = body.replace(
+                GOOGLE_MAPS_API_KEY_PLACEHOLDER.encode("ascii"),
+                escape(self._settings.config.google_maps_api_key or "", quote=True).encode(
+                    "utf-8"
+                ),
+            )
+            body = body.replace(
+                CSP_NONCE_PLACEHOLDER.encode("ascii"),
+                (csp_nonce or "").encode("ascii"),
+            )
         content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         self.send_response(HTTPStatus.OK)
-        self._send_common_headers()
+        self._send_common_headers(csp_nonce=csp_nonce)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-cache")
@@ -890,14 +906,33 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
     def _send_error(self, status: HTTPStatus, code: str, message: str) -> None:
         self._send_json(status, {"error": code, "message": message})
 
-    def _send_common_headers(self) -> None:
+    def _send_common_headers(self, *, csp_nonce: str | None = None) -> None:
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Referrer-Policy", "same-origin")
+        self.send_header(
+            "Referrer-Policy",
+            "strict-origin-when-cross-origin" if csp_nonce else "same-origin",
+        )
+        if csp_nonce:
+            content_security_policy = (
+                "default-src 'self'; "
+                f"script-src 'nonce-{csp_nonce}' 'strict-dynamic' https: 'unsafe-eval' blob:; "
+                f"style-src 'self' 'nonce-{csp_nonce}' https://fonts.googleapis.com; "
+                "connect-src 'self' https://*.googleapis.com https://*.google.com "
+                "https://*.gstatic.com data: blob:; "
+                "img-src 'self' https://*.googleapis.com https://*.gstatic.com "
+                "https://*.google.com https://*.googleusercontent.com data: blob:; "
+                "frame-src https://*.google.com; font-src 'self' https://fonts.gstatic.com; "
+                "worker-src blob:; base-uri 'none'; form-action 'self'"
+            )
+        else:
+            content_security_policy = (
+                "default-src 'self'; style-src 'self'; script-src 'self'; "
+                "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'"
+            )
         self.send_header(
             "Content-Security-Policy",
-            "default-src 'self'; style-src 'self'; script-src 'self'; "
-            "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'",
+            content_security_policy,
         )
 
     def log_message(self, format: str, *args: object) -> None:

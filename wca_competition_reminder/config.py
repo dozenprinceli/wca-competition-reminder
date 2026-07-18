@@ -107,6 +107,7 @@ class AppConfig:
     smtp: SmtpConfig
     recipients: tuple[RecipientConfig, ...]
     admins: tuple[AdminConfig, ...] = ()
+    google_maps_api_key: str | None = None
 
 
 def _table(document: dict[str, object], name: str) -> dict[str, object]:
@@ -128,6 +129,15 @@ def _string(document: dict[str, object], name: str, default: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ConfigurationError(f"{name} must be a non-empty string")
     return value.strip()
+
+
+def _optional_string(document: dict[str, object], name: str) -> str | None:
+    value = document.get(name)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ConfigurationError(f"{name} must be a string")
+    return value.strip() or None
 
 
 def _integer(
@@ -273,6 +283,11 @@ def load_config(path: Path) -> AppConfig:
     full_reconcile_hours = _integer(document, "full_reconcile_hours", 24, minimum=1, maximum=168)
     max_emails_per_run = _integer(document, "max_emails_per_run", 100, minimum=1, maximum=1000)
 
+    web_document = document.get("web", {})
+    if not isinstance(web_document, dict):
+        raise ConfigurationError("invalid [web] table")
+    google_maps_api_key = _optional_string(web_document, "google_maps_api_key")
+
     wca_document = _table(document, "wca")
     base_url = _string(wca_document, "base_url", "https://www.worldcubeassociation.org").rstrip("/")
     parsed_base_url = urlsplit(base_url)
@@ -398,6 +413,7 @@ def load_config(path: Path) -> AppConfig:
         smtp=smtp,
         recipients=tuple(recipients),
         admins=tuple(admins),
+        google_maps_api_key=google_maps_api_key,
     )
 
 

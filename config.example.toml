@@ -6,6 +6,11 @@ coordinate_retry_hours = 24
 full_reconcile_hours = 24
 max_emails_per_run = 100
 
+[web]
+# Optional: enables the Google Maps location picker in the browser subscription form.
+# Browser API keys are public; restrict this key by HTTP referrer and to Maps JavaScript API.
+google_maps_api_key = ""
+
 [wca]
 base_url = "https://www.worldcubeassociation.org"
 user_agent = "wca-competition-reminder/0.1 (contact: replace-with-your-email@example.com)"

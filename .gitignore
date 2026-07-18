@@ -11,3 +11,4 @@ smtp_password
 runner.lock
 logs/
 .env
+tmp/

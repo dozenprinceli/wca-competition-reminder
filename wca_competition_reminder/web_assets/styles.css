@@ -33,6 +33,10 @@ body {
   background: var(--ink);
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 button,
 input,
 textarea {
@@ -511,6 +515,48 @@ textarea[aria-invalid="true"] {
   display: contents;
 }
 
+.coordinate-fields {
+  display: grid;
+  grid-column: span 2;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 17px;
+  min-width: 0;
+}
+
+.location-picker-button {
+  display: inline-flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 11px;
+  color: var(--ink);
+  background: rgba(105, 216, 209, 0.14);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.location-picker-button:hover,
+.location-picker-button:focus-visible {
+  background: var(--cyan);
+  box-shadow: 3px 3px 0 var(--ink);
+  outline: none;
+}
+
+.location-picker-button:active {
+  transform: translateY(1px);
+}
+
+.location-picker-icon {
+  font-family: "Space Mono", "Cascadia Mono", monospace;
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .verification-field {
   position: relative;
   display: grid;
@@ -871,6 +917,137 @@ input[readonly] {
   background: #dc604b;
 }
 
+.location-dialog {
+  width: min(900px, calc(100vw - 40px));
+  max-width: none;
+  max-height: calc(100vh - 40px);
+  padding: 0;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 12px 12px 0 rgba(17, 25, 31, 0.42);
+}
+
+.location-dialog[open] {
+  animation: lift-in 220ms ease both;
+}
+
+.location-dialog::backdrop {
+  background: rgba(17, 25, 31, 0.74);
+}
+
+.location-dialog-layout {
+  display: grid;
+  min-width: 0;
+}
+
+.location-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.location-dialog-header h2 {
+  margin: 4px 0 0;
+  font-family: "Noto Serif SC", "Noto Serif JP", "Songti SC", serif;
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.location-dialog-close {
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.location-dialog-close:hover,
+.location-dialog-close:focus-visible {
+  background: var(--acid);
+  border-color: var(--ink);
+  outline: none;
+}
+
+.location-map-frame {
+  position: relative;
+  height: min(56vh, 520px);
+  min-height: 360px;
+  margin: 18px 20px 0;
+  overflow: hidden;
+  background: var(--paper-deep);
+  border: 1px solid var(--ink);
+}
+
+.location-map {
+  width: 100%;
+  height: 100%;
+}
+
+.location-map-status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--muted);
+  background: var(--paper-deep);
+  font-family: "Space Mono", "Cascadia Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.location-map-status.is-error {
+  color: #9f3d2e;
+  background: #f8e5df;
+}
+
+.location-coordinate-readout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 54px;
+  margin: 0 20px;
+  padding: 11px 0;
+  border-bottom: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.location-coordinate-readout output {
+  color: var(--ink);
+  font-family: "Space Mono", "Cascadia Mono", monospace;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.location-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px 20px;
+}
+
+#location-dialog-confirm:disabled {
+  cursor: not-allowed;
+}
+
 .side-column {
   display: grid;
   gap: 14px;
@@ -1156,6 +1333,15 @@ input[readonly] {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .coordinate-fields {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .location-picker-button {
+    grid-column: auto;
+  }
+
   .verification-field {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1206,6 +1392,36 @@ input[readonly] {
   .detail-card {
     grid-column: auto;
   }
+
+  .location-dialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+  }
+
+  .location-dialog-header {
+    padding: 15px 16px 13px;
+  }
+
+  .location-map-frame {
+    height: min(52vh, 430px);
+    min-height: 300px;
+    margin: 14px 16px 0;
+  }
+
+  .location-coordinate-readout {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+    margin-inline: 16px;
+  }
+
+  .location-coordinate-readout output {
+    text-align: left;
+  }
+
+  .location-dialog-footer {
+    padding: 14px 16px 17px;
+  }
 }
 
 @media (max-width: 420px) {
@@ -1253,5 +1469,14 @@ input[readonly] {
 
   .button-primary {
     justify-content: center;
+  }
+
+  .location-dialog {
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+  }
+
+  .location-map-frame {
+    min-height: 270px;
   }
 }
