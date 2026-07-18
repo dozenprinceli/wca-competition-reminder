@@ -268,6 +268,18 @@ const TRANSLATIONS = {
 const FALLBACK_EVENT_IDS = Object.keys(EVENT_LABELS);
 const STORAGE_KEY = "wca-reminder-email";
 const LANGUAGE_STORAGE_KEY = "wca-reminder-language";
+const CHINESE_REGION_CODES = new Set(["CN", "HK", "MO", "TW"]);
+const CHINESE_REGION_TIME_ZONES = new Set([
+  "Asia/Shanghai",
+  "Asia/Chongqing",
+  "Asia/Chungking",
+  "Asia/Harbin",
+  "Asia/Urumqi",
+  "Asia/Hong_Kong",
+  "Asia/Macau",
+  "Asia/Macao",
+  "Asia/Taipei",
+]);
 const APPLICATION_BASE_PATH =
   document.querySelector('meta[name="application-base-path"]')?.content || "";
 
@@ -276,12 +288,43 @@ function applicationUrl(path) {
   return `${APPLICATION_BASE_PATH}${normalizedPath}`;
 }
 
-function initialLanguage() {
+function normalizeLanguage(value) {
+  return value === "zh" || value === "en" ? value : null;
+}
+
+function browserRegionLanguage() {
+  const locale = navigator.languages?.[0] || navigator.language || "";
+  let region = "";
   try {
-    return window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === "en" ? "en" : "zh";
+    const parsedLocale = new Intl.Locale(String(locale).replaceAll("_", "-"));
+    region = parsedLocale.region || parsedLocale.maximize().region || "";
   } catch (_error) {
-    return "zh";
+    region = String(locale).match(/(?:^|-)(CN|HK|MO|TW)(?:-|$)/i)?.[1] || "";
   }
+  if (CHINESE_REGION_CODES.has(region.toUpperCase())) return "zh";
+
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (CHINESE_REGION_TIME_ZONES.has(timeZone)) return "zh";
+  } catch (_error) {
+    // Fall through to English when browser region information is unavailable.
+  }
+  return "en";
+}
+
+function initialLanguage() {
+  const requestedLanguage = normalizeLanguage(
+    new URLSearchParams(window.location.search).get("lang"),
+  );
+  if (requestedLanguage) return requestedLanguage;
+
+  try {
+    const storedLanguage = normalizeLanguage(window.localStorage.getItem(LANGUAGE_STORAGE_KEY));
+    if (storedLanguage) return storedLanguage;
+  } catch (_error) {
+    // Continue with browser region detection when storage is unavailable.
+  }
+  return browserRegionLanguage();
 }
 
 const state = {
@@ -356,6 +399,12 @@ function persistLanguage(language) {
   }
 }
 
+function replaceLanguageQuery(language) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("lang", language);
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 function formatUpdatedAt(value) {
   const updatedAt = new Date(value);
   if (Number.isNaN(updatedAt.getTime())) return "";
@@ -428,7 +477,10 @@ function applyModeCopy() {
 
 function applyLanguage(language, { persist = true } = {}) {
   state.language = language === "en" ? "en" : "zh";
-  if (persist) persistLanguage(state.language);
+  if (persist) {
+    persistLanguage(state.language);
+    replaceLanguageQuery(state.language);
+  }
   document.documentElement.lang = state.language === "en" ? "en" : "zh-CN";
   document.querySelectorAll("[data-i18n]").forEach((element) => {
     element.textContent = t(element.dataset.i18n);
