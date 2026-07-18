@@ -38,6 +38,26 @@ const EVENT_LABELS_EN = {
   "333mbf": "3x3 Multi-Blind",
 };
 
+const EVENT_LABELS_JA = {
+  "333": "3x3キューブ",
+  "222": "2x2キューブ",
+  "444": "4x4キューブ",
+  "555": "5x5キューブ",
+  "666": "6x6キューブ",
+  "777": "7x7キューブ",
+  "333bf": "3x3目隠し",
+  "333fm": "3x3最少手数",
+  "333oh": "3x3片手",
+  clock: "クロック",
+  minx: "メガミンクス",
+  pyram: "ピラミンクス",
+  skewb: "スキューブ",
+  sq1: "スクエア1",
+  "444bf": "4x4目隠し",
+  "555bf": "5x5目隠し",
+  "333mbf": "3x3マルチブラインド",
+};
+
 const TRANSLATIONS = {
   zh: {
     pageTitle: "WCA 比赛公示提醒 | 邮件订阅",
@@ -57,8 +77,10 @@ const TRANSLATIONS = {
     languageSwitchLabel: "语言切换",
     languageZh: "中文",
     languageEn: "EN",
+    languageJa: "日本語",
     switchToChinese: "切换到中文",
     switchToEnglish: "切换到英文",
+    switchToJapanese: "切换到日语",
     emailLabel: "邮箱地址",
     nameLabel: "称呼",
     namePlaceholder: "例如：Alex",
@@ -167,10 +189,12 @@ const TRANSLATIONS = {
     subscriptionStatus: "Subscription status",
     languageLabel: "Language",
     languageSwitchLabel: "Language switcher",
-    languageZh: "ZH",
+    languageZh: "中文",
     languageEn: "EN",
+    languageJa: "日本語",
     switchToChinese: "Switch to Chinese",
     switchToEnglish: "Switch to English",
+    switchToJapanese: "Switch to Japanese",
     emailLabel: "Email address",
     nameLabel: "Name",
     namePlaceholder: "e.g. Alex",
@@ -263,12 +287,127 @@ const TRANSLATIONS = {
     apiEmailUnavailable: "Verification email delivery is temporarily unavailable.",
     apiGeneric: "The request failed. Please try again later.",
   },
+  ja: {
+    pageTitle: "WCA 大会告知リマインダー | メール登録",
+    subscriptionOperations: "登録操作",
+    brandName: "大会告知リマインダー",
+    emailChannelOnline: "メール配信オンライン",
+    subscriptionMode: "登録モード",
+    modeRegisterLabel: "リマインダーを登録",
+    modeModifyLabel: "設定を変更",
+    modeCancelLabel: "登録を解除",
+    railFootCopy: "ここで登録するのは WCA 大会告知リマインダーサービスです。大会への参加登録ではありません。新しい大会が告知されると、メールでお知らせします。",
+    heroLine1: "WCA 大会の",
+    heroLine2: "告知をメールで受け取る。",
+    currentTime: "現在時刻",
+    subscriptionStatus: "登録状況",
+    languageLabel: "言語",
+    languageSwitchLabel: "言語切り替え",
+    languageZh: "中文",
+    languageEn: "EN",
+    languageJa: "日本語",
+    switchToChinese: "中国語に切り替え",
+    switchToEnglish: "英語に切り替え",
+    switchToJapanese: "日本語に切り替え",
+    emailLabel: "メールアドレス",
+    nameLabel: "お名前",
+    namePlaceholder: "例：Alex",
+    latitudeLabel: "緯度",
+    latitudeHint: "任意。経度と一緒に入力してください",
+    longitudeLabel: "経度",
+    longitudeHint: "空欄の場合、メールの距離は - と表示されます",
+    distanceLabel: "最大直線距離（km）",
+    distancePlaceholder: "例：300",
+    distanceHint: "任意。設定する場合は緯度・経度が必要です",
+    verificationLabel: "メール認証コード",
+    verificationPlaceholder: "6桁の認証コード",
+    verificationHint: "コードの有効期限は5分です",
+    loadedSubscription: "現在の登録を読み込みました",
+    eventsSection: "対象種目",
+    eventsSectionNote: "未選択 = すべての種目",
+    eventsLegend: "WCA種目を選択",
+    loadingEvents: "種目一覧を読み込んでいます…",
+    regionsSection: "地域フィルター",
+    regionsSectionNote: "選択した条件をすべて適用",
+    countryLabel: "国 / 地域",
+    countryPlaceholder: "WCAの国または地域を検索",
+    countryOptionsLabel: "WCAの国と地域",
+    loadingCountries: "WCAから一覧を読み込んでいます…",
+    continentLabel: "大陸",
+    loadingContinents: "読み込んでいます…",
+    continentHint: "未選択の場合は大陸を限定しません",
+    consent: "WCA大会告知リマインダーメールを受け取ることに同意します",
+    activeChannels: "件の有効な登録",
+    healthFootnote: "サービスは毎分、WCAの新しい大会告知を確認します。",
+    logicEventTitle: "種目の一致",
+    logicEventCopy: "選択したWCA種目だけを対象",
+    logicRegionTitle: "地域の一致",
+    logicRegionCopy: "大会の国・地域または大陸が一致",
+    logicDistanceTitle: "距離の一致",
+    logicDistanceCopy: "任意。設定した半径内の大会のみ通知",
+    logicDeliveryTitle: "メール配信",
+    logicDeliveryCopy: "一時的な配信失敗は自動で再試行",
+    registerKicker: "新規登録",
+    registerTitle: "大会告知リマインダーを登録",
+    registerDescription: "ここで登録するのはリマインダーサービスで、大会への参加登録ではありません。WCAが条件に合う新しい大会を告知すると、メールでお知らせします。",
+    registerSubmit: "リマインダーを登録",
+    registerEmailHint: "大会告知を受け取るメールアドレス（登録の識別子）",
+    modifyKicker: "設定を変更",
+    modifyTitle: "大会告知リマインダーの設定を変更",
+    modifyDescription: "メールアドレスを入力すると現在の登録を読み込み、設定を変更できます。",
+    modifySubmit: "登録を読み込む",
+    modifyEmailHint: "登録時のメールアドレスを入力してください",
+    cancelKicker: "登録を解除",
+    cancelTitle: "大会告知リマインダーを解除",
+    cancelDescription: "登録したメールアドレスを入力してください。解除すると、待機中の通知も停止します。",
+    cancelSubmit: "登録を解除",
+    cancelEmailHint: "認証コードや管理トークンは不要です",
+    reset: "クリア",
+    resetLookup: "もう一度検索",
+    saveChanges: "変更を保存",
+    loadingSubscription: "読み込み中",
+    sendCode: "認証コードを送信",
+    cooldown: "{{seconds}}秒後に再試行",
+    countryDirectoryUnavailable: "WCA地域一覧を利用できません",
+    countryCount: "{{count}} / {{total}} のWCA国・地域",
+    noCountryMatch: "一致する地域がありません",
+    retryLater: "後でもう一度お試しください",
+    updatedAt: "{{value}}に更新",
+    loadedDescription: "現在の設定を読み込みました。変更を保存すると、今後の大会に適用されます。",
+    invalidEmail: "有効なメールアドレスを入力してください。",
+    missingName: "メールに表示するお名前を入力してください。",
+    coordinatesTogether: "緯度と経度は両方入力するか、両方空欄にしてください。",
+    latitudeRange: "緯度は -90 から 90 の範囲で入力してください。",
+    longitudeRange: "経度は -180 から 180 の範囲で入力してください。",
+    distancePositive: "最大直線距離は0 kmより大きくしてください。",
+    distanceNeedsCoordinates: "最大距離を設定する場合は、緯度と経度を入力してください。",
+    verificationRequired: "メールに記載された6桁の認証コードを入力してください。",
+    consentRequired: "登録するには、WCA大会告知リマインダーメールの受信に同意してください。",
+    serviceUnavailable: "サービスを一時的に利用できません。後でもう一度お試しください。",
+    loadedToast: "現在の登録設定を読み込みました。",
+    missingSubscription: "このメールアドレスは未登録です。登録画面に切り替えます。",
+    readFailure: "登録を読み込めませんでした。後でもう一度お試しください。",
+    codeSent: "認証コードを送信しました。5分以内に登録を完了してください。",
+    alreadySubscribedLoading: "このメールアドレスは登録済みです。現在の設定を読み込みます。",
+    codeFailure: "認証コードを送信できませんでした。後でもう一度お試しください。",
+    registrationSuccess: "登録が完了し、現在の設定を読み込みました。",
+    updateSuccess: "リマインダー設定を更新しました。今後の大会に適用されます。",
+    cancelSuccess: "登録を解除しました。待機中の通知は送信されません。",
+    operationFailure: "操作に失敗しました。後でもう一度お試しください。",
+    apiInvalidRequest: "リクエストが無効です。内容を確認してもう一度お試しください。",
+    apiAlreadySubscribed: "このメールアドレスは登録済みです。",
+    apiNotFound: "該当する登録が見つかりません。",
+    apiRateLimited: "リクエストが多すぎます。{{seconds}}秒後に再試行してください。",
+    apiEmailUnavailable: "認証メールを一時的に送信できません。後でもう一度お試しください。",
+    apiGeneric: "リクエストに失敗しました。後でもう一度お試しください。",
+  },
 };
 
 const FALLBACK_EVENT_IDS = Object.keys(EVENT_LABELS);
 const STORAGE_KEY = "wca-reminder-email";
 const LANGUAGE_STORAGE_KEY = "wca-reminder-language";
 const CHINESE_REGION_CODES = new Set(["CN", "HK", "MO", "TW"]);
+const JAPANESE_REGION_CODES = new Set(["JP"]);
 const CHINESE_REGION_TIME_ZONES = new Set([
   "Asia/Shanghai",
   "Asia/Chongqing",
@@ -280,6 +419,7 @@ const CHINESE_REGION_TIME_ZONES = new Set([
   "Asia/Macao",
   "Asia/Taipei",
 ]);
+const JAPANESE_REGION_TIME_ZONES = new Set(["Asia/Tokyo"]);
 const APPLICATION_BASE_PATH =
   document.querySelector('meta[name="application-base-path"]')?.content || "";
 
@@ -289,22 +429,28 @@ function applicationUrl(path) {
 }
 
 function normalizeLanguage(value) {
-  return value === "zh" || value === "en" ? value : null;
+  return value === "zh" || value === "en" || value === "ja" ? value : null;
 }
 
 function browserRegionLanguage() {
   const locale = navigator.languages?.[0] || navigator.language || "";
   let region = "";
+  let localeLanguage = "";
   try {
     const parsedLocale = new Intl.Locale(String(locale).replaceAll("_", "-"));
+    localeLanguage = parsedLocale.language?.toLowerCase() || "";
     region = parsedLocale.region || parsedLocale.maximize().region || "";
   } catch (_error) {
-    region = String(locale).match(/(?:^|-)(CN|HK|MO|TW)(?:-|$)/i)?.[1] || "";
+    const normalizedLocale = String(locale).replaceAll("_", "-");
+    localeLanguage = normalizedLocale.match(/^(ja|zh|en)(?:-|$)/i)?.[1]?.toLowerCase() || "";
+    region = normalizedLocale.match(/(?:^|-)(JP|CN|HK|MO|TW)(?:-|$)/i)?.[1] || "";
   }
+  if (JAPANESE_REGION_CODES.has(region.toUpperCase()) || localeLanguage === "ja") return "ja";
   if (CHINESE_REGION_CODES.has(region.toUpperCase())) return "zh";
 
   try {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (JAPANESE_REGION_TIME_ZONES.has(timeZone)) return "ja";
     if (CHINESE_REGION_TIME_ZONES.has(timeZone)) return "zh";
   } catch (_error) {
     // Fall through to English when browser region information is unavailable.
@@ -408,7 +554,7 @@ function replaceLanguageQuery(language) {
 function formatUpdatedAt(value) {
   const updatedAt = new Date(value);
   if (Number.isNaN(updatedAt.getTime())) return "";
-  const locale = state.language === "en" ? "en-US" : "zh-CN";
+  const locale = state.language === "en" ? "en-US" : state.language === "ja" ? "ja-JP" : "zh-CN";
   return t("updatedAt", {
     value: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
       updatedAt,
@@ -476,12 +622,13 @@ function applyModeCopy() {
 }
 
 function applyLanguage(language, { persist = true } = {}) {
-  state.language = language === "en" ? "en" : "zh";
+  state.language = normalizeLanguage(language) || "zh";
   if (persist) {
     persistLanguage(state.language);
     replaceLanguageQuery(state.language);
   }
-  document.documentElement.lang = state.language === "en" ? "en" : "zh-CN";
+  document.documentElement.lang =
+    state.language === "en" ? "en" : state.language === "ja" ? "ja" : "zh-CN";
   document.querySelectorAll("[data-i18n]").forEach((element) => {
     element.textContent = t(element.dataset.i18n);
   });
@@ -649,8 +796,16 @@ function renderOptions() {
       name: "events",
       value: id,
       label:
-        (state.language === "en" ? EVENT_LABELS_EN[id] : EVENT_LABELS[id]) ||
-        (state.language === "en" ? id : typeof event === "object" ? event.name : id),
+        (state.language === "en"
+          ? EVENT_LABELS_EN[id]
+          : state.language === "ja"
+            ? EVENT_LABELS_JA[id]
+            : EVENT_LABELS[id]) ||
+        (state.language === "en" || state.language === "ja"
+          ? id
+          : typeof event === "object"
+            ? event.name
+            : id),
       code: id,
     });
     choice.querySelector("input").checked = selectedEvents.has(id);
@@ -1033,13 +1188,16 @@ function updateClock() {
   const now = new Date();
   setText(
     "#local-clock",
-    new Intl.DateTimeFormat(state.language === "en" ? "en-US" : "zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Shanghai",
-    }).format(now),
+    new Intl.DateTimeFormat(
+      state.language === "en" ? "en-US" : state.language === "ja" ? "ja-JP" : "zh-CN",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Shanghai",
+      },
+    ).format(now),
   );
 }
 

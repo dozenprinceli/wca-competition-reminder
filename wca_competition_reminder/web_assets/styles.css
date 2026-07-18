@@ -13,7 +13,7 @@
   --shadow: rgba(17, 25, 31, 0.12);
   color: var(--ink);
   background: var(--ink);
-  font-family: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", sans-serif;
+  font-family: "IBM Plex Sans", "Noto Sans JP", "Noto Sans SC", "PingFang SC", sans-serif;
   font-synthesis: none;
 }
 
@@ -148,6 +148,7 @@ button {
   grid-template-columns: 28px minmax(0, 1fr) 20px;
   align-items: center;
   min-height: 48px;
+  min-width: 0;
   padding: 0 10px;
   color: var(--muted-on-ink);
   text-align: left;
@@ -256,6 +257,11 @@ button {
   animation: lift-in 520ms ease both;
 }
 
+.topbar > div:first-child,
+.topbar-meta {
+  min-width: 0;
+}
+
 .eyebrow,
 .panel-kicker,
 .card-label,
@@ -286,6 +292,18 @@ h1 {
   font-weight: 600;
   line-height: 1.05;
   letter-spacing: 0;
+}
+
+html[lang="ja"] h1,
+html[lang="ja"] h2,
+html[lang="ja"] .brand-name {
+  font-family: "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif SC", serif;
+}
+
+html[lang="ja"] h1 {
+  max-width: 700px;
+  font-size: 3.6rem;
+  overflow-wrap: anywhere;
 }
 
 h1 em {
@@ -1092,12 +1110,17 @@ input[readonly] {
 
   .topbar {
     align-items: flex-end;
+    flex-wrap: wrap;
     margin-bottom: 24px;
   }
 
   h1 {
     margin-top: 10px;
     font-size: 2.35rem;
+  }
+
+  html[lang="ja"] h1 {
+    font-size: 2.2rem;
   }
 
   .topbar-meta {
@@ -1188,6 +1211,14 @@ input[readonly] {
 @media (max-width: 420px) {
   .topbar {
     display: block;
+  }
+
+  html[lang="ja"] h1 {
+    font-size: 1.8rem;
+  }
+
+  html[lang="ja"] .panel-heading h2 {
+    font-size: 1.25rem;
   }
 
   .topbar-meta {
