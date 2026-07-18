@@ -31,6 +31,7 @@ from wca_competition_reminder.subscriptions import (
     SubscriptionNotFoundError,
     SubscriptionService,
     SubscriptionValidationError,
+    SubscriptionView,
     normalize_email,
 )
 from wca_competition_reminder.utils import mask_email, utc_now
@@ -335,13 +336,16 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                     },
                 )
             return
+        if parsed.path == "/api/admin/activity-logs":
+            self._admin_activity_logs(parsed.query)
+            return
         if parsed.path == "/api/admin/snapshot":
             session = self._require_admin("admin_snapshot_view")
             if session is None:
                 return
             try:
                 with StateStore(self._settings.config.state_path) as state:
-                    snapshot = state.admin_snapshot()
+                    snapshot = state.admin_snapshot(now=self._reminder_server._clock())
                     managed_config_emails = {
                         recipient.email
                         for recipient in self._settings.config.recipients
@@ -380,12 +384,18 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             try:
                 options = cast(ReminderHttpServer, self.server).options_payload()
             except WcaApiError:
+                self._audit(
+                    "subscription_options_view",
+                    "failed",
+                    level=logging.ERROR,
+                )
                 self._send_error(
                     HTTPStatus.SERVICE_UNAVAILABLE,
                     "wca_unavailable",
                     "暂时无法读取 WCA 地区目录",
                 )
             else:
+                self._audit("subscription_options_view", "success")
                 self._send_json(HTTPStatus.OK, options)
             return
         if parsed.path == "/api/health":
@@ -405,7 +415,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                 self._audit(
                     "subscription_lookup",
                     "rejected",
-                    email=self._masked_payload_email(payload),
+                    email=self._payload_email(payload),
+                    reason=str(exc),
                     level=logging.WARNING,
                 )
                 self._send_error(HTTPStatus.BAD_REQUEST, "invalid_request", str(exc))
@@ -413,7 +424,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                 self._audit(
                     "subscription_lookup",
                     "not_found",
-                    email=self._masked_payload_email(payload),
+                    email=self._payload_email(payload),
+                    reason=str(exc),
                     level=logging.WARNING,
                 )
                 self._send_error(HTTPStatus.NOT_FOUND, "not_found", str(exc))
@@ -421,11 +433,15 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                 self._audit(
                     "subscription_lookup",
                     "success",
-                    email=mask_email(subscription.email),
+                    email=subscription.email,
                 )
                 self._send_json(HTTPStatus.OK, {"subscription": subscription.to_dict()})
             return
         if parsed.path in STATIC_FILES:
+            if parsed.path in {"/", "/index.html"}:
+                self._audit("subscription_page_view", "success")
+            elif parsed.path in {"/admin", "/admin/", "/admin.html"}:
+                self._audit("admin_page_view", "success")
             self._send_static(STATIC_FILES[parsed.path])
             return
         self._send_error(HTTPStatus.NOT_FOUND, "not_found", "资源不存在")
@@ -460,7 +476,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "subscription_register",
                 "rejected",
-                email=self._masked_payload_email(payload),
+                email=self._payload_email(payload),
+                reason=str(exc),
                 level=logging.WARNING,
             )
             self._send_error(HTTPStatus.BAD_REQUEST, "invalid_request", str(exc))
@@ -468,7 +485,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "subscription_register",
                 "conflict",
-                email=self._masked_payload_email(payload),
+                email=self._payload_email(payload),
+                reason=str(exc),
                 level=logging.WARNING,
             )
             self._send_error(HTTPStatus.CONFLICT, "already_subscribed", str(exc))
@@ -476,7 +494,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "subscription_register",
                 "success",
-                email=mask_email(subscription.email),
+                email=subscription.email,
+                subscription=self._subscription_audit_details(subscription),
             )
             self._send_json(
                 HTTPStatus.CREATED,
@@ -500,7 +519,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "verification_code_request",
                 "rejected",
-                email=self._masked_payload_email(payload),
+                email=self._payload_email(payload),
+                reason=str(exc),
                 level=logging.WARNING,
             )
             self._send_error(HTTPStatus.BAD_REQUEST, "invalid_request", str(exc))
@@ -508,7 +528,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "verification_code_request",
                 "conflict",
-                email=mask_email(email),
+                email=email,
+                reason=str(exc),
                 level=logging.WARNING,
             )
             self._send_error(HTTPStatus.CONFLICT, "already_subscribed", str(exc))
@@ -516,7 +537,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "verification_code_request",
                 "rate_limited",
-                email=mask_email(email),
+                email=email,
+                retry_after_seconds=exc.retry_after_seconds,
                 level=logging.WARNING,
             )
             self._send_json(
@@ -537,7 +559,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "verification_code_request",
                 "delivery_failed",
-                email=mask_email(email),
+                email=email,
                 level=logging.ERROR,
             )
             self._send_error(
@@ -549,7 +571,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "verification_code_request",
                 "success",
-                email=mask_email(email),
+                email=email,
+                expires_in_seconds=VERIFICATION_CODE_SECONDS,
             )
             self._send_json(
                 HTTPStatus.OK,
@@ -573,7 +596,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "subscription_update",
                 "rejected",
-                email=self._masked_payload_email(payload),
+                email=self._payload_email(payload),
+                reason=str(exc),
                 level=logging.WARNING,
             )
             self._send_error(HTTPStatus.BAD_REQUEST, "invalid_request", str(exc))
@@ -581,7 +605,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "subscription_update",
                 "not_found",
-                email=self._masked_payload_email(payload),
+                email=self._payload_email(payload),
+                reason=str(exc),
                 level=logging.WARNING,
             )
             self._send_error(HTTPStatus.NOT_FOUND, "not_found", str(exc))
@@ -589,7 +614,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "subscription_update",
                 "success",
-                email=mask_email(subscription.email),
+                email=subscription.email,
+                subscription=self._subscription_audit_details(subscription),
             )
             self._send_json(HTTPStatus.OK, {"subscription": subscription.to_dict()})
 
@@ -606,7 +632,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "subscription_cancel",
                 "rejected",
-                email=self._masked_payload_email(payload),
+                email=self._payload_email(payload),
+                reason=str(exc),
                 level=logging.WARNING,
             )
             self._send_error(HTTPStatus.BAD_REQUEST, "invalid_request", str(exc))
@@ -614,7 +641,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "subscription_cancel",
                 "not_found",
-                email=self._masked_payload_email(payload),
+                email=self._payload_email(payload),
+                reason=str(exc),
                 level=logging.WARNING,
             )
             self._send_error(HTTPStatus.NOT_FOUND, "not_found", str(exc))
@@ -622,9 +650,83 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._audit(
                 "subscription_cancel",
                 "success",
-                email=mask_email(subscription.email),
+                email=subscription.email,
+                subscription=self._subscription_audit_details(subscription),
             )
             self._send_json(HTTPStatus.OK, {"subscription": subscription.to_dict()})
+
+    def _admin_activity_logs(self, query_string: str) -> None:
+        session = self._require_admin("admin_activity_logs_view")
+        if session is None:
+            return
+
+        query = parse_qs(query_string, keep_blank_values=True)
+
+        def first(name: str) -> str:
+            return query.get(name, [""])[0].strip()
+
+        try:
+            limit = int(first("limit") or "100")
+            before_value = first("before_id")
+            before_id = int(before_value) if before_value else None
+            actor_value = first("actor_type")
+            actor_type = actor_value if actor_value and actor_value != "all" else None
+            action_value = first("action")
+            action = action_value if action_value and action_value != "all" else None
+            outcome_value = first("outcome")
+            outcome = outcome_value if outcome_value and outcome_value != "all" else None
+            search = first("search") or None
+            with StateStore(self._settings.config.state_path) as state:
+                result = state.activity_logs(
+                    now=self._reminder_server._clock(),
+                    limit=limit,
+                    before_id=before_id,
+                    actor_type=actor_type,
+                    action=action,
+                    outcome=outcome,
+                    search=search,
+                )
+        except ValueError as exc:
+            self._audit(
+                "admin_activity_logs_view",
+                "rejected",
+                username=session.username,
+                reason=str(exc),
+                level=logging.WARNING,
+            )
+            self._send_error(HTTPStatus.BAD_REQUEST, "invalid_request", str(exc))
+            return
+        except Exception:
+            LOGGER.exception("admin activity log query failed")
+            self._audit(
+                "admin_activity_logs_view",
+                "failed",
+                username=session.username,
+                level=logging.ERROR,
+            )
+            self._send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                "activity_logs_failed",
+                "行为日志读取失败",
+            )
+            return
+
+        result.update(
+            {
+                "generated_at": self._reminder_server._clock().isoformat(),
+                "timezone": self._settings.config.timezone_name,
+            }
+        )
+        self._audit(
+            "admin_activity_logs_view",
+            "success",
+            username=session.username,
+            returned_count=len(cast(list[object], result["items"])),
+            actor_filter=actor_type,
+            action_filter=action,
+            outcome_filter=outcome,
+        )
+        self._send_json(HTTPStatus.OK, cast(dict[str, Any], result))
 
     def _admin_login(self) -> None:
         if not self._settings.config.admins:
@@ -799,10 +901,54 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             )
 
     @staticmethod
-    def _masked_payload_email(payload: object) -> str:
+    def _payload_email(payload: object) -> str | None:
         if not isinstance(payload, dict) or not isinstance(payload.get("email"), str):
-            return "-"
-        return mask_email(payload["email"])
+            return None
+        email = payload["email"].strip().lower()
+        return email[:320] or None
+
+    @staticmethod
+    def _subscription_audit_details(subscription: SubscriptionView) -> dict[str, object]:
+        return {
+            "name": subscription.name,
+            "latitude": subscription.latitude,
+            "longitude": subscription.longitude,
+            "max_distance_km": subscription.max_distance_km,
+            "events": list(subscription.events) if subscription.events is not None else None,
+            "countries": (
+                list(subscription.countries) if subscription.countries is not None else None
+            ),
+            "continents": (
+                list(subscription.continents) if subscription.continents is not None else None
+            ),
+            "active": subscription.active,
+            "updated_at": subscription.updated_at.isoformat(),
+            "cancelled_at": (
+                subscription.cancelled_at.isoformat()
+                if subscription.cancelled_at is not None
+                else None
+            ),
+        }
+
+    @classmethod
+    def _audit_detail_value(cls, value: object, *, depth: int = 0) -> object:
+        if value is None or isinstance(value, bool | int | float):
+            return value
+        if isinstance(value, str):
+            return value[:500]
+        if depth >= 3:
+            return str(value)[:500]
+        if isinstance(value, dict):
+            return {
+                str(key)[:80]: cls._audit_detail_value(item, depth=depth + 1)
+                for key, item in list(value.items())[:40]
+            }
+        if isinstance(value, list | tuple | set | frozenset):
+            return [
+                cls._audit_detail_value(item, depth=depth + 1)
+                for item in list(value)[:50]
+            ]
+        return str(value)[:500]
 
     def _audit(
         self,
@@ -813,7 +959,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
         **details: object,
     ) -> None:
         suffix = "".join(
-            f" {key}={self._safe_log_value(value)}"
+            f" {key}={self._safe_log_value(mask_email(str(value)) if key == 'email' else value)}"
             for key, value in details.items()
             if value is not None
         )
@@ -825,6 +971,33 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             self._safe_log_value(self.client_address[0]),
             suffix,
         )
+        email_value = details.get("email")
+        email = str(email_value).strip()[:320] if email_value is not None else None
+        persisted_details = {
+            str(key)[:80]: self._audit_detail_value(value)
+            for key, value in details.items()
+            if key != "email" and value is not None
+        }
+        user_agent = self.headers.get("User-Agent", "").strip()[:512] or None
+        try:
+            with StateStore(self._settings.config.state_path) as state:
+                state.record_activity_log(
+                    created_at=self._reminder_server._clock(),
+                    actor_type="admin" if action.startswith("admin_") else "user",
+                    action=action,
+                    outcome=outcome,
+                    email=email or None,
+                    client_ip=self.client_address[0],
+                    method=self.command,
+                    path=urlsplit(self.path).path,
+                    user_agent=user_agent,
+                    details=persisted_details,
+                )
+        except Exception:
+            LOGGER.exception(
+                "activity audit persistence failed action=%s",
+                self._safe_log_value(action),
+            )
 
     @staticmethod
     def _safe_log_value(value: object) -> str:

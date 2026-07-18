@@ -29,7 +29,7 @@ it also includes the straight-line distance; otherwise the distance is shown as 
 - Runs as a one-shot poller or a supervised, once-per-minute service with PM2.
 - Includes a browser subscription desk for registering, editing, and cancelling email alerts.
 - Includes a read-only operations console protected by a list of administrator accounts.
-- Writes masked user/admin audit events to seven-day, level-separated logs.
+- Stores queryable user/admin audit events with a rolling seven-day retention window.
 
 ## Requirements
 
@@ -169,7 +169,9 @@ to localhost when placing it behind a reverse proxy, and terminate HTTPS at that
 
 Open `http://127.0.0.1:8080/admin` and sign in with any `[[admins]]` username/password pair
 from `config.toml`. The read-only console shows processing checkpoints, subscribers,
-competitions, and mail deliveries. Authentication uses an HttpOnly, SameSite session cookie
+competitions, mail deliveries, and seven days of user activity. The activity view supports
+server-side actor/action/outcome filters, email/IP/detail search, and pagination.
+Authentication uses an HttpOnly, SameSite session cookie
 that expires after eight hours and is invalidated by a Web service restart. Public deployments
 must use HTTPS, and `config.toml` should be readable only by the service account. Administrator
 usernames must be unique; add more `[[admins]]` tables when multiple operators need access.
@@ -260,10 +262,17 @@ out file; `ERROR` and `CRITICAL` go to stderr and the error file without duplica
 rotate at midnight, retaining the current file plus six daily archives for seven calendar
 days.
 
-The Web service audits verification requests, registration, lookup, update, cancellation,
-administrator login/logout, and admin data views. Email addresses are masked; passwords and
-verification codes are never logged. The PM2 configuration discards PM2's duplicate log copy,
-so production diagnostics should read `logs/run.*.log` and `logs/web.*.log` directly.
+The Web service stores page views, verification requests, registration, lookup, update,
+cancellation, administrator login/logout, and admin data views in SQLite's `activity_logs`
+table. Structured records include timestamps, outcomes, email addresses, source IPs, request
+paths, user agents, and safely bounded operation details. The admin activity view reads them
+with server-side pagination. Writes and reads delete records older than seven days; SQLite
+reuses the released pages so the table does not grow without bound. Passwords and verification
+codes are never stored.
+
+The same events continue to reach the text audit log with masked email addresses. The PM2
+configuration discards PM2's duplicate log copy, so production diagnostics should read
+`logs/run.*.log` and `logs/web.*.log` directly.
 
 ## Deployment with PM2
 

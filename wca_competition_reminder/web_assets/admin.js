@@ -15,11 +15,42 @@ const DELIVERY_STATUS_LABELS = {
   blocked: "已阻塞",
 };
 
+const ACTIVITY_ACTION_LABELS = {
+  verification_code_request: "获取验证码",
+  subscription_register: "注册订阅",
+  subscription_lookup: "查询订阅",
+  subscription_update: "修改订阅",
+  subscription_cancel: "取消订阅",
+  subscription_page_view: "访问订阅页",
+  subscription_options_view: "读取订阅选项",
+  admin_page_view: "访问管理页",
+  admin_session_check: "检查管理会话",
+  admin_login: "管理员登录",
+  admin_logout: "管理员退出",
+  admin_snapshot_view: "查看管理数据",
+  admin_activity_logs_view: "查看行为日志",
+};
+
+const ACTIVITY_OUTCOME_LABELS = {
+  success: "成功",
+  rejected: "已拒绝",
+  not_found: "未找到",
+  conflict: "冲突",
+  rate_limited: "频率受限",
+  delivery_failed: "发送失败",
+  denied: "认证失败",
+  unauthorized: "未授权",
+  failed: "失败",
+  no_session: "无有效会话",
+  not_configured: "未配置",
+};
+
 const VIEW_META = {
   overview: { index: "01", title: "运行概览" },
   subscribers: { index: "02", title: "订阅用户" },
   competitions: { index: "03", title: "比赛数据" },
   deliveries: { index: "04", title: "投递记录" },
+  activity: { index: "05", title: "用户日志" },
 };
 
 const APPLICATION_BASE_PATH =
@@ -35,6 +66,14 @@ const appState = {
   snapshot: null,
   loading: false,
   refreshTimer: null,
+  activityLogs: [],
+  activityTotal: 0,
+  activityHasMore: false,
+  activityNextBeforeId: null,
+  activityLoading: false,
+  activityLoaded: false,
+  activityRequestGeneration: 0,
+  activitySearchTimer: null,
 };
 
 const authView = document.querySelector("#auth-view");
@@ -98,6 +137,14 @@ function showAuth(message = "") {
   adminView.hidden = true;
   loginMessage.textContent = message;
   appState.snapshot = null;
+  appState.activityLogs = [];
+  appState.activityLoaded = false;
+  appState.activityLoading = false;
+  appState.activityRequestGeneration += 1;
+  if (appState.activitySearchTimer) {
+    window.clearTimeout(appState.activitySearchTimer);
+    appState.activitySearchTimer = null;
+  }
   if (appState.refreshTimer) {
     window.clearInterval(appState.refreshTimer);
     appState.refreshTimer = null;
@@ -151,6 +198,9 @@ function setView(view) {
   });
   setText("#view-index", VIEW_META[view].index);
   setText("#view-title", VIEW_META[view].title);
+  if (view === "activity" && appState.snapshot && !appState.activityLoaded) {
+    void loadActivityLogs({ reset: true });
+  }
 }
 
 function formatDateTime(value) {
@@ -513,12 +563,166 @@ function renderDeliveries() {
   container.replaceChildren(...rows);
 }
 
+function truncateText(value, maximum = 180) {
+  const text = String(value || "");
+  return text.length > maximum ? `${text.slice(0, maximum - 1)}…` : text;
+}
+
+function formatActivityDetails(record) {
+  const details = record.details && typeof record.details === "object" ? record.details : {};
+  const parts = [];
+  if (details.reason) parts.push(`原因：${details.reason}`);
+  if (details.retry_after_seconds) parts.push(`${details.retry_after_seconds} 秒后重试`);
+  if (details.expires_in_seconds) parts.push(`有效期：${details.expires_in_seconds} 秒`);
+  if (details.returned_count !== undefined) parts.push(`返回 ${details.returned_count} 条`);
+
+  const subscription = details.subscription;
+  if (subscription && typeof subscription === "object") {
+    if (subscription.name) parts.push(`称呼：${subscription.name}`);
+    parts.push(`项目：${listSummary(subscription.events, "全部")}`);
+    const regions = [...(subscription.countries || []), ...(subscription.continents || [])];
+    parts.push(`地区：${listSummary(regions, "全球")}`);
+    if (subscription.max_distance_km) parts.push(`半径：${subscription.max_distance_km} km`);
+    if (subscription.latitude !== null && subscription.latitude !== undefined) {
+      parts.push(
+        `坐标：${Number(subscription.latitude).toFixed(4)}, ${Number(subscription.longitude).toFixed(4)}`,
+      );
+    }
+    if (subscription.active === false) parts.push("订阅已停用");
+  }
+
+  const filterLabels = [
+    ["actor_filter", "主体"],
+    ["action_filter", "行为"],
+    ["outcome_filter", "结果"],
+  ];
+  filterLabels.forEach(([key, label]) => {
+    if (details[key]) parts.push(`${label}筛选：${details[key]}`);
+  });
+  return truncateText(parts.join(" · ") || "—", 900);
+}
+
+function renderActivityLogs() {
+  const container = document.querySelector("#activity-rows");
+  const records = appState.activityLogs;
+  setText("#activity-result-count", `${formatNumber(appState.activityTotal)} 条`);
+  setText(
+    "#activity-page-state",
+    records.length
+      ? `已显示 ${formatNumber(records.length)} / ${formatNumber(appState.activityTotal)}`
+      : "没有匹配记录",
+  );
+  const loadMoreButton = document.querySelector("#activity-load-more");
+  loadMoreButton.hidden = !appState.activityHasMore;
+  loadMoreButton.disabled = appState.activityLoading;
+  if (!records.length) {
+    renderEmptyRow(container, 6, "没有匹配的行为日志");
+    return;
+  }
+
+  const rows = records.map((record) => {
+    const row = createElement("tr");
+    addTextCell(row, formatDateTime(record.created_at), `#${record.id}`);
+
+    const username = record.details?.username;
+    const identity = record.email || username || "匿名访问";
+    addTextCell(row, identity, record.actor_type === "admin" ? "ADMIN" : "USER");
+    addTextCell(
+      row,
+      ACTIVITY_ACTION_LABELS[record.action] || record.action,
+      record.action,
+    );
+    addStatusCell(
+      row,
+      record.outcome,
+      ACTIVITY_OUTCOME_LABELS[record.outcome] || record.outcome,
+    );
+    addTextCell(row, record.client_ip, `${record.method} ${record.path}`);
+    addTextCell(
+      row,
+      formatActivityDetails(record),
+      record.user_agent ? truncateText(record.user_agent, 150) : null,
+    );
+    return row;
+  });
+  container.replaceChildren(...rows);
+}
+
+async function loadActivityLogs({ reset = false } = {}) {
+  if (!reset && (appState.activityLoading || !appState.activityHasMore)) return;
+  const generation = reset
+    ? ++appState.activityRequestGeneration
+    : appState.activityRequestGeneration;
+  appState.activityLoading = true;
+  const loadMoreButton = document.querySelector("#activity-load-more");
+  loadMoreButton.disabled = true;
+  if (reset) {
+    appState.activityLogs = [];
+    appState.activityTotal = 0;
+    appState.activityHasMore = false;
+    appState.activityNextBeforeId = null;
+    loadMoreButton.hidden = true;
+    setText("#activity-page-state", "正在读取行为日志");
+    renderEmptyRow(document.querySelector("#activity-rows"), 6, "正在读取行为日志");
+  }
+
+  const parameters = new URLSearchParams({ limit: "100" });
+  const actor = document.querySelector("#activity-actor-filter").value;
+  const action = document.querySelector("#activity-action-filter").value;
+  const outcome = document.querySelector("#activity-outcome-filter").value;
+  const search = document.querySelector("#activity-search").value.trim();
+  if (actor !== "all") parameters.set("actor_type", actor);
+  if (action !== "all") parameters.set("action", action);
+  if (outcome !== "all") parameters.set("outcome", outcome);
+  if (search) parameters.set("search", search);
+  if (!reset && appState.activityNextBeforeId) {
+    parameters.set("before_id", String(appState.activityNextBeforeId));
+  }
+
+  try {
+    const result = await requestJson(`/api/admin/activity-logs?${parameters.toString()}`);
+    if (generation !== appState.activityRequestGeneration) return;
+    const items = Array.isArray(result.items) ? result.items : [];
+    appState.activityLogs = reset ? items : [...appState.activityLogs, ...items];
+    appState.activityTotal = Number(result.total || 0);
+    appState.activityHasMore = Boolean(result.has_more);
+    appState.activityNextBeforeId = result.next_before_id || null;
+    appState.activityLoaded = true;
+    setText("#activity-retention", `最近 ${formatNumber(result.retention_days || 7)} 天`);
+    setText(
+      "#activity-retained-from",
+      result.retained_from ? `起始 ${formatDateTime(result.retained_from)}` : "—",
+    );
+    renderActivityLogs();
+  } catch (error) {
+    if (generation !== appState.activityRequestGeneration) return;
+    if (error instanceof ApiError && error.status === 401) {
+      showAuth("会话已过期，请重新登录");
+      return;
+    }
+    appState.activityLoaded = false;
+    loadMoreButton.hidden = true;
+    renderEmptyRow(
+      document.querySelector("#activity-rows"),
+      6,
+      error instanceof Error ? error.message : "行为日志读取失败",
+    );
+    setText("#activity-page-state", "读取失败");
+  } finally {
+    if (generation === appState.activityRequestGeneration) {
+      appState.activityLoading = false;
+      loadMoreButton.disabled = false;
+    }
+  }
+}
+
 function renderSnapshot(snapshot) {
   appState.snapshot = snapshot;
   const subscriberCount = (snapshot.subscribers || []).length + (snapshot.configured_recipients || []).length;
   setText("#nav-subscriber-count", formatNumber(subscriberCount));
   setText("#nav-competition-count", formatNumber(snapshot.counts?.competitions?.total));
   setText("#nav-delivery-count", formatNumber(snapshot.counts?.deliveries?.total));
+  setText("#nav-activity-count", formatNumber(snapshot.counts?.activity_logs?.users));
   setText("#last-updated", formatDateTime(snapshot.generated_at));
   setText("#timezone-label", `TIMEZONE ${snapshot.timezone || "—"}`);
   setText("#admin-username", snapshot.admin?.username || "admin");
@@ -536,6 +740,9 @@ async function loadSnapshot() {
     const snapshot = await requestJson("/api/admin/snapshot");
     renderSnapshot(snapshot);
     clearLoading();
+    if (appState.view === "activity") {
+      await loadActivityLogs({ reset: true });
+    }
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       showAuth("会话已过期，请重新登录");
@@ -598,6 +805,22 @@ document.querySelector("#competition-search").addEventListener("input", renderCo
 document.querySelector("#competition-filter").addEventListener("change", renderCompetitions);
 document.querySelector("#delivery-search").addEventListener("input", renderDeliveries);
 document.querySelector("#delivery-filter").addEventListener("change", renderDeliveries);
+document.querySelector("#activity-load-more").addEventListener("click", () => {
+  void loadActivityLogs();
+});
+document.querySelector("#activity-search").addEventListener("input", () => {
+  if (appState.activitySearchTimer) window.clearTimeout(appState.activitySearchTimer);
+  appState.activitySearchTimer = window.setTimeout(() => {
+    void loadActivityLogs({ reset: true });
+  }, 300);
+});
+["#activity-actor-filter", "#activity-action-filter", "#activity-outcome-filter"].forEach(
+  (selector) => {
+    document.querySelector(selector).addEventListener("change", () => {
+      void loadActivityLogs({ reset: true });
+    });
+  },
+);
 
 async function initialize() {
   setView("overview");

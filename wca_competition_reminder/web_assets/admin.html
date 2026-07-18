@@ -99,6 +99,9 @@
           <button class="nav-item" type="button" role="tab" aria-selected="false" data-view="deliveries">
             <span>04</span><b>投递记录</b><i id="nav-delivery-count">0</i>
           </button>
+          <button class="nav-item" type="button" role="tab" aria-selected="false" data-view="activity">
+            <span>05</span><b>用户日志</b><i id="nav-activity-count">0</i>
+          </button>
         </nav>
         <div class="rail-account">
           <p class="mono-label">SIGNED IN AS</p>
@@ -288,6 +291,83 @@
                 <thead><tr><th>收件人</th><th>比赛</th><th>状态</th><th>尝试</th><th>创建时间</th><th>完成 / 下次尝试</th></tr></thead>
                 <tbody id="delivery-rows"></tbody>
               </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="admin-section" id="activity-section" role="tabpanel" data-section="activity" hidden>
+          <section class="data-panel activity-panel" aria-labelledby="activity-title">
+            <div class="section-heading table-heading activity-heading">
+              <div>
+                <p class="mono-label">USER ACTIVITY LEDGER</p>
+                <h2 id="activity-title">行为日志</h2>
+              </div>
+              <div class="table-tools activity-tools">
+                <label class="search-control activity-search">
+                  <span class="sr-only">搜索行为日志</span>
+                  <input id="activity-search" type="search" placeholder="搜索邮箱、IP 或详情" autocomplete="off" maxlength="160" />
+                </label>
+                <label class="select-control">
+                  <span class="sr-only">筛选行为主体</span>
+                  <select id="activity-actor-filter">
+                    <option value="user">用户行为</option>
+                    <option value="all">全部主体</option>
+                    <option value="admin">管理员</option>
+                  </select>
+                </label>
+                <label class="select-control">
+                  <span class="sr-only">筛选行为类型</span>
+                  <select id="activity-action-filter">
+                    <option value="all">全部行为</option>
+                    <option value="verification_code_request">获取验证码</option>
+                    <option value="subscription_register">注册订阅</option>
+                    <option value="subscription_lookup">查询订阅</option>
+                    <option value="subscription_update">修改订阅</option>
+                    <option value="subscription_cancel">取消订阅</option>
+                    <option value="subscription_page_view">访问订阅页</option>
+                    <option value="subscription_options_view">读取订阅选项</option>
+                    <option value="admin_page_view">访问管理页</option>
+                    <option value="admin_session_check">检查管理会话</option>
+                    <option value="admin_login">管理员登录</option>
+                    <option value="admin_logout">管理员退出</option>
+                    <option value="admin_snapshot_view">查看管理数据</option>
+                    <option value="admin_activity_logs_view">查看行为日志</option>
+                  </select>
+                </label>
+                <label class="select-control">
+                  <span class="sr-only">筛选执行结果</span>
+                  <select id="activity-outcome-filter">
+                    <option value="all">全部结果</option>
+                    <option value="success">成功</option>
+                    <option value="rejected">已拒绝</option>
+                    <option value="not_found">未找到</option>
+                    <option value="conflict">冲突</option>
+                    <option value="rate_limited">频率受限</option>
+                    <option value="delivery_failed">发送失败</option>
+                    <option value="denied">认证失败</option>
+                    <option value="unauthorized">未授权</option>
+                    <option value="failed">失败</option>
+                    <option value="no_session">无有效会话</option>
+                    <option value="not_configured">未配置</option>
+                  </select>
+                </label>
+                <span class="result-count" id="activity-result-count">0 条</span>
+              </div>
+            </div>
+            <div class="retention-strip">
+              <span>ROLLING RETENTION</span>
+              <strong id="activity-retention">最近 7 天</strong>
+              <time id="activity-retained-from">—</time>
+            </div>
+            <div class="table-scroll">
+              <table class="wide-table activity-table">
+                <thead><tr><th>时间</th><th>身份</th><th>行为</th><th>结果</th><th>请求来源</th><th>详细信息</th></tr></thead>
+                <tbody id="activity-rows"></tbody>
+              </table>
+            </div>
+            <div class="activity-pagination">
+              <span id="activity-page-state">—</span>
+              <button id="activity-load-more" type="button" hidden>加载更早记录</button>
             </div>
           </section>
         </section>

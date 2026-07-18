@@ -11,6 +11,7 @@ from tests.conftest import NOW, make_summary
 from wca_competition_reminder.config import RecipientConfig
 from wca_competition_reminder.models import CompetitionSummary
 from wca_competition_reminder.state import (
+    ACTIVITY_LOG_RETENTION_DAYS,
     MIGRATABLE_SCHEMA_VERSION,
     SCHEMA_VERSION,
     StateError,
@@ -170,3 +171,86 @@ def test_admin_snapshot_rejects_invalid_limits(tmp_path: Path, limit: int) -> No
         pytest.raises(ValueError, match="between 1 and 500"),
     ):
         state.admin_snapshot(limit=limit)
+
+
+def test_activity_logs_roll_over_after_seven_days_and_support_pagination(
+    tmp_path: Path,
+) -> None:
+    with StateStore(tmp_path / "state.sqlite3") as state:
+        state.record_activity_log(
+            created_at=NOW - timedelta(days=ACTIVITY_LOG_RETENTION_DAYS + 1),
+            actor_type="user",
+            action="subscription_page_view",
+            outcome="success",
+            email=None,
+            client_ip="192.0.2.1",
+            method="GET",
+            path="/",
+        )
+        boundary_id = state.record_activity_log(
+            created_at=NOW - timedelta(days=ACTIVITY_LOG_RETENTION_DAYS),
+            actor_type="user",
+            action="subscription_lookup",
+            outcome="not_found",
+            email="boundary@example.com",
+            client_ip="192.0.2.2",
+            method="GET",
+            path="/api/subscriptions",
+        )
+        user_id = state.record_activity_log(
+            created_at=NOW,
+            actor_type="user",
+            action="subscription_register",
+            outcome="success",
+            email="new@example.com",
+            client_ip="192.0.2.3",
+            method="POST",
+            path="/api/subscriptions",
+            user_agent="test-browser/1.0",
+            details={"subscription": {"events": ["333", "minx"]}},
+        )
+        admin_id = state.record_activity_log(
+            created_at=NOW,
+            actor_type="admin",
+            action="admin_login",
+            outcome="success",
+            email=None,
+            client_ip="192.0.2.4",
+            method="POST",
+            path="/api/admin/login",
+            details={"username": "operator"},
+        )
+
+        first_page = state.activity_logs(now=NOW, limit=2)
+        second_page = state.activity_logs(
+            now=NOW,
+            limit=2,
+            before_id=first_page["next_before_id"],
+        )
+        searched = state.activity_logs(
+            now=NOW,
+            actor_type="user",
+            action="subscription_register",
+            outcome="success",
+            search="new@example.com",
+        )
+        snapshot = state.admin_snapshot(now=NOW)
+
+    assert first_page["total"] == 3
+    assert first_page["has_more"] is True
+    assert [item["id"] for item in first_page["items"]] == [admin_id, user_id]
+    assert first_page["next_before_id"] == user_id
+    assert [item["id"] for item in second_page["items"]] == [boundary_id]
+    assert second_page["has_more"] is False
+    assert searched["total"] == 1
+    assert searched["items"][0]["email"] == "new@example.com"
+    assert searched["items"][0]["details"] == {
+        "subscription": {"events": ["333", "minx"]}
+    }
+    assert searched["retention_days"] == 7
+    assert snapshot["counts"]["activity_logs"] == {
+        "total": 3,
+        "users": 2,
+        "admins": 1,
+        "retention_days": 7,
+    }

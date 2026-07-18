@@ -900,6 +900,24 @@ p {
   min-width: min(100%, 540px);
 }
 
+.activity-heading {
+  align-items: flex-start;
+}
+
+.activity-tools {
+  flex: 1 1 720px;
+  flex-wrap: wrap;
+  min-width: min(100%, 720px);
+}
+
+.activity-tools .activity-search {
+  flex: 1 1 220px;
+}
+
+.activity-tools .select-control select {
+  min-width: 118px;
+}
+
 .search-control {
   flex: 1 1 220px;
 }
@@ -934,6 +952,34 @@ table {
 
 .wide-table {
   min-width: 880px;
+}
+
+.activity-table {
+  min-width: 1180px;
+}
+
+.activity-table th:nth-child(1) {
+  width: 14%;
+}
+
+.activity-table th:nth-child(2) {
+  width: 16%;
+}
+
+.activity-table th:nth-child(3) {
+  width: 14%;
+}
+
+.activity-table th:nth-child(4) {
+  width: 10%;
+}
+
+.activity-table th:nth-child(5) {
+  width: 18%;
+}
+
+.activity-table th:nth-child(6) {
+  width: 28%;
 }
 
 th,
@@ -1004,7 +1050,8 @@ tbody tr:hover td {
 
 .status-badge[data-status="active"],
 .status-badge[data-status="sent"],
-.status-badge[data-status="queued"] {
+.status-badge[data-status="queued"],
+.status-badge[data-status="success"] {
   background: rgba(105, 216, 209, 0.2);
   border-color: rgba(39, 125, 118, 0.3);
 }
@@ -1012,13 +1059,20 @@ tbody tr:hover td {
 .status-badge[data-status="pending"],
 .status-badge[data-status="pending_details"],
 .status-badge[data-status="pending_coordinates"],
-.status-badge[data-status="sending"] {
+.status-badge[data-status="sending"],
+.status-badge[data-status="conflict"],
+.status-badge[data-status="rate_limited"] {
   background: rgba(239, 189, 98, 0.22);
   border-color: rgba(173, 123, 31, 0.28);
 }
 
 .status-badge[data-status="blocked"],
-.status-badge[data-status="error"] {
+.status-badge[data-status="error"],
+.status-badge[data-status="rejected"],
+.status-badge[data-status="denied"],
+.status-badge[data-status="unauthorized"],
+.status-badge[data-status="failed"],
+.status-badge[data-status="delivery_failed"] {
   color: var(--danger);
   background: #f7e8e3;
   border-color: rgba(201, 78, 63, 0.25);
@@ -1026,6 +1080,9 @@ tbody tr:hover td {
 
 .status-badge[data-status="inactive"],
 .status-badge[data-status="baseline"],
+.status-badge[data-status="not_found"],
+.status-badge[data-status="no_session"],
+.status-badge[data-status="not_configured"],
 .status-badge[data-status^="ignored"] {
   color: var(--muted);
   background: var(--paper-deep);
@@ -1047,6 +1104,64 @@ tbody tr:hover td {
   height: 92px;
   color: var(--muted);
   text-align: center;
+}
+
+.retention-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 9px 20px;
+  color: var(--muted);
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  font-family: "Space Mono", "Cascadia Mono", monospace;
+  font-size: 0.59rem;
+}
+
+.retention-strip strong {
+  color: var(--ink);
+  font-size: 0.64rem;
+}
+
+.retention-strip time {
+  margin-left: auto;
+}
+
+.activity-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 54px;
+  padding: 9px 20px;
+  color: var(--muted);
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  font-family: "Space Mono", "Cascadia Mono", monospace;
+  font-size: 0.6rem;
+}
+
+.activity-pagination button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--acid);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  font-size: 0.63rem;
+  font-weight: 700;
+}
+
+.activity-pagination button:hover {
+  background: var(--cyan);
+}
+
+.activity-pagination button:disabled {
+  color: var(--muted);
+  background: var(--paper-deep);
+  border-color: var(--line);
+  cursor: wait;
 }
 
 .workspace-footer {
@@ -1133,6 +1248,15 @@ tbody tr:hover td {
     grid-column: span 2;
     border-top: 1px solid var(--line);
   }
+
+  .activity-heading {
+    display: grid;
+  }
+
+  .activity-tools {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1200,6 +1324,14 @@ tbody tr:hover td {
 
   .overview-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .activity-tools .select-control {
+    flex: 1 1 130px;
+  }
+
+  .activity-tools .select-control select {
+    width: 100%;
   }
 }
 
@@ -1278,6 +1410,35 @@ tbody tr:hover td {
 
   .search-control {
     grid-column: 1 / -1;
+  }
+
+  .activity-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .activity-tools .select-control select {
+    min-width: 0;
+  }
+
+  .activity-tools .result-count {
+    grid-column: 1 / -1;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .retention-strip {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding-inline: 14px;
+  }
+
+  .retention-strip time {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .activity-pagination {
+    padding-inline: 14px;
   }
 
   .workspace-footer {

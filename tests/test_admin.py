@@ -71,8 +71,14 @@ def test_admin_page_authentication_snapshot_and_logout(
         assert 'name="application-base-path" content=""' in page
         assert 'href="/admin.css"' in page
         assert 'src="/admin.js"' in page
+        assert 'data-view="activity"' in page
+        assert 'id="activity-rows"' in page
 
         response, body = request_json(connection, "GET", "/api/admin/snapshot")
+        assert response.status == 401
+        assert body["error"] == "unauthorized"
+
+        response, body = request_json(connection, "GET", "/api/admin/activity-logs")
         assert response.status == 401
         assert body["error"] == "unauthorized"
 
@@ -112,6 +118,24 @@ def test_admin_page_authentication_snapshot_and_logout(
         assert body["counts"]["subscribers"]["effective"] == 2
         assert len(body["configured_recipients"]) == 2
         assert body["configured_recipients"][0]["effective"] is False
+        assert body["counts"]["activity_logs"]["retention_days"] == 7
+
+        response, body = request_json(
+            connection,
+            "GET",
+            "/api/admin/activity-logs?actor_type=admin&limit=2",
+            headers={"Cookie": cookie},
+        )
+        assert response.status == 200
+        assert body["retention_days"] == 7
+        assert body["total"] >= 2
+        assert len(body["items"]) == 2
+        assert body["has_more"] is True
+        assert any(
+            item["action"] == "admin_snapshot_view" and item["outcome"] == "success"
+            for item in body["items"]
+        )
+        assert all(item["actor_type"] == "admin" for item in body["items"])
 
         response, body = request_json(
             connection,

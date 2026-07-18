@@ -334,6 +334,37 @@ def test_http_verification_and_subscription_endpoints(tmp_path: Path, caplog) ->
             f"/api/subscriptions?{urlencode({'email': 'new@example.com'})}",
         )
         assert response.status == 404
+
+        with StateStore(server.settings.config.state_path) as state:
+            activity = state.activity_logs(
+                now=clock.current,
+                actor_type="user",
+                limit=50,
+            )
+        actions = {(item["action"], item["outcome"]) for item in activity["items"]}
+        assert {
+            ("verification_code_request", "success"),
+            ("verification_code_request", "rate_limited"),
+            ("subscription_register", "rejected"),
+            ("subscription_register", "success"),
+            ("subscription_lookup", "success"),
+            ("subscription_lookup", "not_found"),
+            ("subscription_update", "success"),
+            ("subscription_cancel", "success"),
+        } <= actions
+        register_log = next(
+            item
+            for item in activity["items"]
+            if item["action"] == "subscription_register" and item["outcome"] == "success"
+        )
+        assert register_log["email"] == "new@example.com"
+        assert register_log["method"] == "POST"
+        assert register_log["path"] == "/api/subscriptions"
+        assert register_log["details"]["subscription"]["max_distance_km"] == 300
+        serialized_activity = json.dumps(activity, ensure_ascii=False)
+        assert "123456" not in serialized_activity
+        assert all("verification_code" not in item["details"] for item in activity["items"])
+
         assert "audit action=verification_code_request outcome=success" in caplog.text
         assert "audit action=subscription_register outcome=success" in caplog.text
         assert "audit action=subscription_lookup outcome=success" in caplog.text

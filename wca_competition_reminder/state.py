@@ -20,11 +20,13 @@ from wca_competition_reminder.models import (
     PendingCompetition,
     SubscriberRecord,
 )
-from wca_competition_reminder.utils import from_utc_text, retry_at, to_utc_text
+from wca_competition_reminder.utils import from_utc_text, retry_at, to_utc_text, utc_now
 from wca_competition_reminder.wca import summary_from_json
 
 SCHEMA_VERSION = 4
 MIGRATABLE_SCHEMA_VERSION = 3
+ACTIVITY_LOG_RETENTION_DAYS = 7
+ACTIVITY_LOG_DETAILS_MAX_BYTES = 16 * 1024
 
 _STATE_TABLES = {"app_state", "subscribers", "competitions", "deliveries"}
 _V3_REQUIRED_COLUMNS = {
@@ -273,6 +275,26 @@ class StateStore:
 
             CREATE INDEX IF NOT EXISTS deliveries_due
                 ON deliveries(status, next_attempt_at, lease_until);
+
+            CREATE TABLE IF NOT EXISTS activity_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                actor_type TEXT NOT NULL CHECK (actor_type IN ('user', 'admin', 'system')),
+                action TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                email TEXT,
+                client_ip TEXT NOT NULL,
+                method TEXT NOT NULL,
+                path TEXT NOT NULL,
+                user_agent TEXT,
+                details_json TEXT NOT NULL DEFAULT '{}'
+            );
+
+            CREATE INDEX IF NOT EXISTS activity_logs_created_at
+                ON activity_logs(created_at DESC, id DESC);
+
+            CREATE INDEX IF NOT EXISTS activity_logs_actor_action
+                ON activity_logs(actor_type, action, outcome, id DESC);
             """
         )
 
@@ -835,6 +857,198 @@ class StateStore:
         )
         return cursor.rowcount
 
+    def record_activity_log(
+        self,
+        *,
+        created_at: datetime,
+        actor_type: str,
+        action: str,
+        outcome: str,
+        email: str | None,
+        client_ip: str,
+        method: str,
+        path: str,
+        user_agent: str | None = None,
+        details: dict[str, object] | None = None,
+    ) -> int:
+        if actor_type not in {"user", "admin", "system"}:
+            raise ValueError("activity log actor_type is invalid")
+        if not action or len(action) > 80:
+            raise ValueError("activity log action must contain at most 80 characters")
+        if not outcome or len(outcome) > 80:
+            raise ValueError("activity log outcome must contain at most 80 characters")
+        if not client_ip or len(client_ip) > 128:
+            raise ValueError("activity log client_ip must contain at most 128 characters")
+        if not method or len(method) > 16:
+            raise ValueError("activity log method must contain at most 16 characters")
+        if not path or len(path) > 512:
+            raise ValueError("activity log path must contain at most 512 characters")
+        if email is not None and len(email) > 320:
+            raise ValueError("activity log email must contain at most 320 characters")
+        if user_agent is not None and len(user_agent) > 512:
+            raise ValueError("activity log user_agent must contain at most 512 characters")
+        if details is not None and not isinstance(details, dict):
+            raise ValueError("activity log details must be an object")
+
+        details_json = json.dumps(
+            details or {},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        if len(details_json.encode("utf-8")) > ACTIVITY_LOG_DETAILS_MAX_BYTES:
+            raise ValueError("activity log details are too large")
+
+        cutoff = to_utc_text(created_at - timedelta(days=ACTIVITY_LOG_RETENTION_DAYS))
+        with self._transaction():
+            self._connection.execute(
+                "DELETE FROM activity_logs WHERE created_at < ?",
+                (cutoff,),
+            )
+            cursor = self._connection.execute(
+                """
+                INSERT INTO activity_logs(
+                    created_at, actor_type, action, outcome, email, client_ip,
+                    method, path, user_agent, details_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    to_utc_text(created_at),
+                    actor_type,
+                    action,
+                    outcome,
+                    email,
+                    client_ip,
+                    method,
+                    path,
+                    user_agent,
+                    details_json,
+                ),
+            )
+        return int(cursor.lastrowid)
+
+    def purge_activity_logs(self, now: datetime) -> int:
+        cutoff = to_utc_text(now - timedelta(days=ACTIVITY_LOG_RETENTION_DAYS))
+        cursor = self._connection.execute(
+            "DELETE FROM activity_logs WHERE created_at < ?",
+            (cutoff,),
+        )
+        return cursor.rowcount
+
+    def activity_logs(
+        self,
+        *,
+        now: datetime,
+        limit: int = 100,
+        before_id: int | None = None,
+        actor_type: str | None = None,
+        action: str | None = None,
+        outcome: str | None = None,
+        search: str | None = None,
+    ) -> dict[str, object]:
+        if not 1 <= limit <= 200:
+            raise ValueError("activity log limit must be between 1 and 200")
+        if before_id is not None and before_id <= 0:
+            raise ValueError("activity log before_id must be positive")
+        if actor_type is not None and actor_type not in {"user", "admin", "system"}:
+            raise ValueError("activity log actor_type is invalid")
+        for name, value in (("action", action), ("outcome", outcome)):
+            if value is not None and (not value or len(value) > 80):
+                raise ValueError(f"activity log {name} filter is invalid")
+        normalized_search = search.strip() if search is not None else ""
+        if len(normalized_search) > 160:
+            raise ValueError("activity log search must contain at most 160 characters")
+
+        self.purge_activity_logs(now)
+        filters: list[str] = []
+        parameters: list[object] = []
+        if actor_type is not None:
+            filters.append("actor_type = ?")
+            parameters.append(actor_type)
+        if action is not None:
+            filters.append("action = ?")
+            parameters.append(action)
+        if outcome is not None:
+            filters.append("outcome = ?")
+            parameters.append(outcome)
+        if normalized_search:
+            escaped_search = (
+                normalized_search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            pattern = f"%{escaped_search}%"
+            filters.append(
+                """(
+                    email LIKE ? ESCAPE '\\' OR client_ip LIKE ? ESCAPE '\\'
+                    OR action LIKE ? ESCAPE '\\' OR outcome LIKE ? ESCAPE '\\'
+                    OR path LIKE ? ESCAPE '\\' OR user_agent LIKE ? ESCAPE '\\'
+                    OR details_json LIKE ? ESCAPE '\\'
+                )"""
+            )
+            parameters.extend([pattern] * 7)
+
+        where_clause = f" WHERE {' AND '.join(filters)}" if filters else ""
+        total = int(
+            self._connection.execute(
+                f"SELECT COUNT(*) FROM activity_logs{where_clause}",
+                parameters,
+            ).fetchone()[0]
+        )
+
+        page_filters = list(filters)
+        page_parameters = list(parameters)
+        if before_id is not None:
+            page_filters.append("id < ?")
+            page_parameters.append(before_id)
+        page_where_clause = f" WHERE {' AND '.join(page_filters)}" if page_filters else ""
+        rows = self._connection.execute(
+            f"""
+            SELECT id, created_at, actor_type, action, outcome, email, client_ip,
+                   method, path, user_agent, details_json
+            FROM activity_logs
+            {page_where_clause}
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (*page_parameters, limit + 1),
+        ).fetchall()
+        has_more = len(rows) > limit
+        visible_rows = rows[:limit]
+        items: list[dict[str, object]] = []
+        for row in visible_rows:
+            try:
+                details = json.loads(str(row["details_json"]))
+            except json.JSONDecodeError as exc:
+                raise StateError(
+                    f"stored activity log {row['id']} details are invalid JSON"
+                ) from exc
+            if not isinstance(details, dict):
+                raise StateError(f"stored activity log {row['id']} details must be an object")
+            items.append(
+                {
+                    "id": int(row["id"]),
+                    "created_at": str(row["created_at"]),
+                    "actor_type": str(row["actor_type"]),
+                    "action": str(row["action"]),
+                    "outcome": str(row["outcome"]),
+                    "email": str(row["email"]) if row["email"] is not None else None,
+                    "client_ip": str(row["client_ip"]),
+                    "method": str(row["method"]),
+                    "path": str(row["path"]),
+                    "user_agent": (
+                        str(row["user_agent"]) if row["user_agent"] is not None else None
+                    ),
+                    "details": details,
+                }
+            )
+        return {
+            "items": items,
+            "total": total,
+            "has_more": has_more,
+            "next_before_id": int(visible_rows[-1]["id"]) if has_more else None,
+            "retention_days": ACTIVITY_LOG_RETENTION_DAYS,
+            "retained_from": to_utc_text(now - timedelta(days=ACTIVITY_LOG_RETENTION_DAYS)),
+        }
+
     def clear_all(self) -> dict[str, int]:
         with self._transaction():
             competition_count = int(
@@ -847,7 +1061,10 @@ class StateStore:
             self._connection.execute("DELETE FROM competitions")
             self._connection.execute("DELETE FROM subscribers")
             self._connection.execute("DELETE FROM app_state")
-            self._connection.execute("DELETE FROM sqlite_sequence WHERE name = 'deliveries'")
+            self._connection.execute("DELETE FROM activity_logs")
+            self._connection.execute(
+                "DELETE FROM sqlite_sequence WHERE name IN ('deliveries', 'activity_logs')"
+            )
         return {"competitions": competition_count, "deliveries": delivery_count}
 
     def counts(self) -> dict[str, int]:
@@ -861,9 +1078,16 @@ class StateStore:
         counts["competitions"] = int(competition_count["count"])
         return counts
 
-    def admin_snapshot(self, *, limit: int = 200) -> dict[str, object]:
+    def admin_snapshot(
+        self,
+        *,
+        limit: int = 200,
+        now: datetime | None = None,
+    ) -> dict[str, object]:
         if not 1 <= limit <= 500:
             raise ValueError("admin snapshot limit must be between 1 and 500")
+
+        self.purge_activity_logs(now or utc_now())
 
         subscriber_counts = self._connection.execute(
             """
@@ -874,6 +1098,14 @@ class StateStore:
         ).fetchone()
         competition_counts = self._status_counts("competitions")
         delivery_counts = self._status_counts("deliveries")
+        activity_log_counts = self._connection.execute(
+            """
+            SELECT COUNT(*) AS total,
+                   SUM(CASE WHEN actor_type = 'user' THEN 1 ELSE 0 END) AS users,
+                   SUM(CASE WHEN actor_type = 'admin' THEN 1 ELSE 0 END) AS admins
+            FROM activity_logs
+            """
+        ).fetchone()
         app_state = {
             str(row["key"]): str(row["value"])
             for row in self._connection.execute(
@@ -1022,6 +1254,12 @@ class StateStore:
                 },
                 "competitions": competition_counts,
                 "deliveries": delivery_counts,
+                "activity_logs": {
+                    "total": int(activity_log_counts["total"]),
+                    "users": int(activity_log_counts["users"] or 0),
+                    "admins": int(activity_log_counts["admins"] or 0),
+                    "retention_days": ACTIVITY_LOG_RETENTION_DAYS,
+                },
             },
             "checkpoints": {
                 "baseline_completed_at": app_state.get("baseline_completed_at"),
