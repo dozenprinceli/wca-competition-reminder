@@ -6,6 +6,9 @@
     <meta name="theme-color" content="#11191f" />
     <meta name="application-base-path" content="__WCA_APPLICATION_BASE_PATH__" />
     <meta name="google-maps-api-key" content="__WCA_GOOGLE_MAPS_API_KEY__" />
+    <meta name="amap-api-key" content="__WCA_AMAP_API_KEY__" />
+    <meta name="amap-security-js-code" content="__WCA_AMAP_SECURITY_JS_CODE__" />
+    <meta name="amap-service-host" content="__WCA_AMAP_SERVICE_HOST__" />
     <title data-i18n="pageTitle">WCA 比赛公示提醒 | 邮件订阅</title>
     <link rel="icon" href="data:," />
     <style nonce="__WCA_CSP_NONCE__"></style>
@@ -111,7 +114,7 @@
                   </label>
                   <button class="location-picker-button" id="location-picker-button" type="button">
                     <span class="location-picker-icon" aria-hidden="true">⌖</span>
-                    <span data-i18n="mapSelectButton">从 Google 地图选择</span>
+                    <span id="location-picker-label" data-i18n="mapSelectButtonGoogle">从 Google 地图选择</span>
                   </button>
                 </div>
                 <label class="field">
@@ -226,8 +229,8 @@
             </header>
 
             <div class="location-map-frame">
-              <div class="location-map" id="location-map" role="region" aria-label="Google 地图位置选择器" data-i18n-aria-label="mapRegionLabel"></div>
-              <div class="location-map-status" id="location-map-status" role="status" data-i18n="mapLoading">正在加载 Google 地图…</div>
+              <div class="location-map" id="location-map" role="region" aria-label="Google 地图位置选择器" data-i18n-aria-label="mapRegionLabelGoogle"></div>
+              <div class="location-map-status" id="location-map-status" role="status" data-i18n="mapLoadingGoogle">正在加载 Google 地图…</div>
             </div>
 
             <div class="location-coordinate-readout" aria-live="polite">

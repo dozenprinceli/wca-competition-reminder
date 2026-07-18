@@ -157,15 +157,21 @@ def test_forwarded_prefix_scopes_pages_and_admin_cookie(tmp_path: Path) -> None:
         page_response = connection.getresponse()
         page = page_response.read().decode("utf-8")
         assert page_response.status == 200
-        assert (
-            'name="application-base-path" content="/wca-competition-reminder"'
-            in page
-        )
+        assert 'name="application-base-path" content="/wca-competition-reminder"' in page
         assert 'name="google-maps-api-key" content=""' in page
+        assert 'name="amap-api-key" content=""' in page
+        assert 'name="amap-security-js-code" content=""' in page
+        assert 'name="amap-service-host" content=""' in page
         assert "__WCA_GOOGLE_MAPS_API_KEY__" not in page
+        assert "__WCA_AMAP_API_KEY__" not in page
+        assert "__WCA_AMAP_SECURITY_JS_CODE__" not in page
+        assert "__WCA_AMAP_SERVICE_HOST__" not in page
         assert "__WCA_CSP_NONCE__" not in page
         assert page_response.getheader("Referrer-Policy") == "same-origin"
-        assert "googleapis.com" not in str(page_response.getheader("Content-Security-Policy"))
+        content_security_policy = str(page_response.getheader("Content-Security-Policy"))
+        assert "googleapis.com" not in content_security_policy
+        assert "amap.com" not in content_security_policy
+        assert "style-src-elem" not in content_security_policy
         assert 'href="/wca-competition-reminder/styles.css"' in page
         assert 'src="/wca-competition-reminder/app.js"' in page
 
@@ -209,6 +215,8 @@ def test_index_injects_escaped_google_maps_key_and_picker_markup(tmp_path: Path)
 
         assert response.status == 200
         assert 'name="google-maps-api-key" content="maps-key&amp;&quot;&lt;"' in page
+        assert 'name="amap-api-key" content=""' in page
+        assert 'name="amap-service-host" content=""' in page
         assert 'id="location-picker-button"' in page
         assert 'id="location-dialog"' in page
         nonces = re.findall(r'nonce="([^"]+)"', page)
@@ -217,8 +225,80 @@ def test_index_injects_escaped_google_maps_key_and_picker_markup(tmp_path: Path)
         content_security_policy = str(response.getheader("Content-Security-Policy"))
         assert f"'nonce-{nonces[0]}'" in content_security_policy
         assert "'strict-dynamic'" in content_security_policy
+        assert "style-src-elem 'self' https://fonts.googleapis.com 'unsafe-inline'" in (
+            content_security_policy
+        )
         assert "https://*.googleapis.com" in content_security_policy
+        assert "amap.com" not in content_security_policy
         assert response.getheader("Referrer-Policy") == "strict-origin-when-cross-origin"
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_index_injects_escaped_amap_credentials_and_csp_sources(tmp_path: Path) -> None:
+    config = replace(
+        make_config(tmp_path),
+        amap_api_key='amap-key&"<',
+        amap_security_js_code='security-code&"<',
+    )
+    server = web.create_server(config, port=0, verification_sender=lambda *_args: None)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request("GET", "/")
+        response = connection.getresponse()
+        page = response.read().decode("utf-8")
+
+        assert response.status == 200
+        assert 'name="google-maps-api-key" content=""' in page
+        assert 'name="amap-api-key" content="amap-key&amp;&quot;&lt;"' in page
+        assert 'name="amap-security-js-code" content="security-code&amp;&quot;&lt;"' in page
+        assert 'name="amap-service-host" content=""' in page
+        nonces = re.findall(r'nonce="([^"]+)"', page)
+        assert len(nonces) == 3
+        assert len(set(nonces)) == 1
+        content_security_policy = str(response.getheader("Content-Security-Policy"))
+        assert f"'nonce-{nonces[0]}'" in content_security_policy
+        assert "'strict-dynamic'" in content_security_policy
+        assert (
+            "style-src-elem 'self' https://*.amap.com https://*.autonavi.com 'unsafe-inline'"
+            in content_security_policy
+        )
+        assert "https://*.amap.com" in content_security_policy
+        assert "https://*.autonavi.com" in content_security_policy
+        assert "googleapis.com" not in content_security_policy
+        assert response.getheader("Referrer-Policy") == "strict-origin-when-cross-origin"
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_index_injects_amap_service_host_without_security_code(tmp_path: Path) -> None:
+    config = replace(
+        make_config(tmp_path),
+        amap_api_key="amap-key",
+        amap_service_host="/_AMapService",
+    )
+    server = web.create_server(config, port=0, verification_sender=lambda *_args: None)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request("GET", "/")
+        response = connection.getresponse()
+        page = response.read().decode("utf-8")
+
+        assert response.status == 200
+        assert 'name="amap-api-key" content="amap-key"' in page
+        assert 'name="amap-security-js-code" content=""' in page
+        assert 'name="amap-service-host" content="/_AMapService"' in page
+        assert "https://*.amap.com" in str(response.getheader("Content-Security-Policy"))
     finally:
         connection.close()
         server.shutdown()

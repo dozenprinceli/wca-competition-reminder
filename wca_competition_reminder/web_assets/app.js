@@ -91,17 +91,22 @@ const TRANSLATIONS = {
     distanceLabel: "最远直线距离（km）",
     distancePlaceholder: "例如：300",
     distanceHint: "可选；设置后经纬度必填",
-    mapSelectButton: "从 Google 地图选择",
+    mapSelectButtonGoogle: "从 Google 地图选择",
+    mapSelectButtonAmap: "从高德地图选择",
     mapDialogTitle: "选择位置",
     mapCloseLabel: "关闭地图",
-    mapRegionLabel: "Google 地图位置选择器",
-    mapLoading: "正在加载 Google 地图…",
+    mapRegionLabelGoogle: "Google 地图位置选择器",
+    mapRegionLabelAmap: "高德地图位置选择器",
+    mapLoadingGoogle: "正在加载 Google 地图…",
+    mapLoadingAmap: "正在加载高德地图…",
     mapSelectedLabel: "待确认坐标",
     mapNoSelection: "尚未选择位置",
     mapCancel: "取消",
     mapConfirm: "确认位置",
-    mapNotConfigured: "Google 地图尚未配置，请联系服务管理员。",
-    mapLoadFailure: "Google 地图加载失败，请稍后再试。",
+    mapNotConfiguredGoogle: "Google 地图尚未配置，请联系服务管理员。",
+    mapNotConfiguredAmap: "高德地图尚未配置，请联系服务管理员。",
+    mapLoadFailureGoogle: "Google 地图加载失败，请稍后再试。",
+    mapLoadFailureAmap: "高德地图加载失败，请稍后再试。",
     mapSelectionSaved: "经纬度已从地图写入。",
     verificationLabel: "邮箱验证码",
     verificationPlaceholder: "6 位验证码",
@@ -217,17 +222,22 @@ const TRANSLATIONS = {
     distanceLabel: "Max straight-line distance (km)",
     distancePlaceholder: "e.g. 300",
     distanceHint: "Optional; latitude and longitude are required",
-    mapSelectButton: "Choose on Google Maps",
+    mapSelectButtonGoogle: "Choose on Google Maps",
+    mapSelectButtonAmap: "Choose on AMap",
     mapDialogTitle: "Choose a location",
     mapCloseLabel: "Close map",
-    mapRegionLabel: "Google Maps location picker",
-    mapLoading: "Loading Google Maps…",
+    mapRegionLabelGoogle: "Google Maps location picker",
+    mapRegionLabelAmap: "AMap location picker",
+    mapLoadingGoogle: "Loading Google Maps…",
+    mapLoadingAmap: "Loading AMap…",
     mapSelectedLabel: "Coordinates to confirm",
     mapNoSelection: "No location selected",
     mapCancel: "Cancel",
     mapConfirm: "Confirm location",
-    mapNotConfigured: "Google Maps is not configured. Contact the service administrator.",
-    mapLoadFailure: "Google Maps could not be loaded. Try again later.",
+    mapNotConfiguredGoogle: "Google Maps is not configured. Contact the service administrator.",
+    mapNotConfiguredAmap: "AMap is not configured. Contact the service administrator.",
+    mapLoadFailureGoogle: "Google Maps could not be loaded. Try again later.",
+    mapLoadFailureAmap: "AMap could not be loaded. Try again later.",
     mapSelectionSaved: "Coordinates copied from the map.",
     verificationLabel: "Email verification code",
     verificationPlaceholder: "6-digit code",
@@ -343,17 +353,22 @@ const TRANSLATIONS = {
     distanceLabel: "最大直線距離（km）",
     distancePlaceholder: "例：300",
     distanceHint: "任意。設定する場合は緯度・経度が必要です",
-    mapSelectButton: "Google マップで選択",
+    mapSelectButtonGoogle: "Google マップで選択",
+    mapSelectButtonAmap: "高徳地図で選択",
     mapDialogTitle: "場所を選択",
     mapCloseLabel: "地図を閉じる",
-    mapRegionLabel: "Google マップの場所選択",
-    mapLoading: "Google マップを読み込んでいます…",
+    mapRegionLabelGoogle: "Google マップの場所選択",
+    mapRegionLabelAmap: "高徳地図の場所選択",
+    mapLoadingGoogle: "Google マップを読み込んでいます…",
+    mapLoadingAmap: "高徳地図を読み込んでいます…",
     mapSelectedLabel: "確認する座標",
     mapNoSelection: "場所が選択されていません",
     mapCancel: "キャンセル",
     mapConfirm: "この場所を確定",
-    mapNotConfigured: "Google マップが設定されていません。管理者にお問い合わせください。",
-    mapLoadFailure: "Google マップを読み込めませんでした。後でもう一度お試しください。",
+    mapNotConfiguredGoogle: "Google マップが設定されていません。管理者にお問い合わせください。",
+    mapNotConfiguredAmap: "高徳地図が設定されていません。管理者にお問い合わせください。",
+    mapLoadFailureGoogle: "Google マップを読み込めませんでした。後でもう一度お試しください。",
+    mapLoadFailureAmap: "高徳地図を読み込めませんでした。後でもう一度お試しください。",
     mapSelectionSaved: "地図から緯度・経度を入力しました。",
     verificationLabel: "メール認証コード",
     verificationPlaceholder: "6桁の認証コード",
@@ -442,8 +457,25 @@ const TRANSLATIONS = {
 const FALLBACK_EVENT_IDS = Object.keys(EVENT_LABELS);
 const STORAGE_KEY = "wca-reminder-email";
 const LANGUAGE_STORAGE_KEY = "wca-reminder-language";
+const MAP_PROVIDER_GOOGLE = "google";
+const MAP_PROVIDER_AMAP = "amap";
+const MAINLAND_CHINA_ADCODE_PREFIXES = new Set([
+  11, 12, 13, 14, 15,
+  21, 22, 23,
+  31, 32, 33, 34, 35, 36, 37,
+  41, 42, 43, 44, 45, 46,
+  50, 51, 52, 53, 54,
+  61, 62, 63, 64, 65,
+]);
 const CHINESE_REGION_CODES = new Set(["CN", "HK", "MO", "TW"]);
 const JAPANESE_REGION_CODES = new Set(["JP"]);
+const MAINLAND_CHINA_TIME_ZONES = new Set([
+  "Asia/Shanghai",
+  "Asia/Chongqing",
+  "Asia/Chungking",
+  "Asia/Harbin",
+  "Asia/Urumqi",
+]);
 const CHINESE_REGION_TIME_ZONES = new Set([
   "Asia/Shanghai",
   "Asia/Chongqing",
@@ -456,10 +488,48 @@ const CHINESE_REGION_TIME_ZONES = new Set([
   "Asia/Taipei",
 ]);
 const JAPANESE_REGION_TIME_ZONES = new Set(["Asia/Tokyo"]);
+const MAINLAND_CHINA_PROVINCES = [
+  "北京",
+  "天津",
+  "河北",
+  "山西",
+  "内蒙古",
+  "辽宁",
+  "吉林",
+  "黑龙江",
+  "上海",
+  "江苏",
+  "浙江",
+  "安徽",
+  "福建",
+  "江西",
+  "山东",
+  "河南",
+  "湖北",
+  "湖南",
+  "广东",
+  "广西",
+  "海南",
+  "重庆",
+  "四川",
+  "贵州",
+  "云南",
+  "西藏",
+  "陕西",
+  "甘肃",
+  "青海",
+  "宁夏",
+  "新疆",
+];
 const APPLICATION_BASE_PATH =
   document.querySelector('meta[name="application-base-path"]')?.content || "";
 const GOOGLE_MAPS_API_KEY =
   document.querySelector('meta[name="google-maps-api-key"]')?.content.trim() || "";
+const AMAP_API_KEY = document.querySelector('meta[name="amap-api-key"]')?.content.trim() || "";
+const AMAP_SECURITY_JS_CODE =
+  document.querySelector('meta[name="amap-security-js-code"]')?.content.trim() || "";
+const AMAP_SERVICE_HOST =
+  document.querySelector('meta[name="amap-service-host"]')?.content.trim() || "";
 const GOOGLE_MAPS_CALLBACK_NAME = "__wcaCompetitionReminderGoogleMapsReady";
 const CSP_NONCE = document.querySelector("script[nonce]")?.nonce || "";
 
@@ -472,29 +542,50 @@ function normalizeLanguage(value) {
   return value === "zh" || value === "en" || value === "ja" ? value : null;
 }
 
-function browserRegionLanguage() {
+function browserLocaleInfo() {
   const locale = navigator.languages?.[0] || navigator.language || "";
-  let region = "";
-  let localeLanguage = "";
+  let explicitRegion = "";
+  let inferredRegion = "";
+  let language = "";
   try {
     const parsedLocale = new Intl.Locale(String(locale).replaceAll("_", "-"));
-    localeLanguage = parsedLocale.language?.toLowerCase() || "";
-    region = parsedLocale.region || parsedLocale.maximize().region || "";
+    language = parsedLocale.language?.toLowerCase() || "";
+    explicitRegion = parsedLocale.region || "";
+    inferredRegion = explicitRegion || parsedLocale.maximize().region || "";
   } catch (_error) {
     const normalizedLocale = String(locale).replaceAll("_", "-");
-    localeLanguage = normalizedLocale.match(/^(ja|zh|en)(?:-|$)/i)?.[1]?.toLowerCase() || "";
-    region = normalizedLocale.match(/(?:^|-)(JP|CN|HK|MO|TW)(?:-|$)/i)?.[1] || "";
+    language = normalizedLocale.match(/^(ja|zh|en)(?:-|$)/i)?.[1]?.toLowerCase() || "";
+    explicitRegion = normalizedLocale.match(/(?:^|-)(JP|CN|HK|MO|TW)(?:-|$)/i)?.[1] || "";
+    inferredRegion = explicitRegion;
   }
-  if (JAPANESE_REGION_CODES.has(region.toUpperCase()) || localeLanguage === "ja") return "ja";
-  if (CHINESE_REGION_CODES.has(region.toUpperCase())) return "zh";
+  return {
+    explicitRegion: explicitRegion.toUpperCase(),
+    inferredRegion: inferredRegion.toUpperCase(),
+    language,
+  };
+}
 
+function browserTimeZone() {
   try {
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (JAPANESE_REGION_TIME_ZONES.has(timeZone)) return "ja";
-    if (CHINESE_REGION_TIME_ZONES.has(timeZone)) return "zh";
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   } catch (_error) {
-    // Fall through to English when browser region information is unavailable.
+    return "";
   }
+}
+
+function browserLikelyInMainlandChina() {
+  const { explicitRegion } = browserLocaleInfo();
+  return explicitRegion === "CN" || MAINLAND_CHINA_TIME_ZONES.has(browserTimeZone());
+}
+
+function browserRegionLanguage() {
+  const { inferredRegion, language } = browserLocaleInfo();
+  if (JAPANESE_REGION_CODES.has(inferredRegion) || language === "ja") return "ja";
+  if (CHINESE_REGION_CODES.has(inferredRegion)) return "zh";
+
+  const timeZone = browserTimeZone();
+  if (JAPANESE_REGION_TIME_ZONES.has(timeZone)) return "ja";
+  if (CHINESE_REGION_TIME_ZONES.has(timeZone)) return "zh";
   return "en";
 }
 
@@ -539,6 +630,7 @@ const nameInput = document.querySelector("#name");
 const latitudeInput = document.querySelector("#latitude");
 const longitudeInput = document.querySelector("#longitude");
 const locationPickerButton = document.querySelector("#location-picker-button");
+const locationPickerLabel = document.querySelector("#location-picker-label");
 const locationDialog = document.querySelector("#location-dialog");
 const locationDialogClose = document.querySelector("#location-dialog-close");
 const locationDialogCancel = document.querySelector("#location-dialog-cancel");
@@ -566,9 +658,16 @@ const languageButtons = document.querySelectorAll(".language-button");
 
 let googleMapsPromise = null;
 let googleMapsRequestedLocale = null;
+let amapPromise = null;
+let preferredMapProvider = null;
+let activeMapProvider = null;
+let detectedAmapCity = null;
 let locationMap = null;
+let locationMapProvider = null;
 let locationSelectionLayer = null;
 let locationSelectionFeature = null;
+let amapSelectionMarker = null;
+let pendingProviderLocation = null;
 let pendingLocation = null;
 let locationDialogGeneration = 0;
 
@@ -677,6 +776,52 @@ function applyModeCopy() {
   updateVerificationButton();
 }
 
+function mapProviderConfigured(provider) {
+  if (provider === MAP_PROVIDER_AMAP) {
+    return Boolean(AMAP_API_KEY && (AMAP_SECURITY_JS_CODE || AMAP_SERVICE_HOST));
+  }
+  return Boolean(GOOGLE_MAPS_API_KEY);
+}
+
+function initialMapProvider() {
+  const googleConfigured = mapProviderConfigured(MAP_PROVIDER_GOOGLE);
+  const amapConfigured = mapProviderConfigured(MAP_PROVIDER_AMAP);
+  if (googleConfigured !== amapConfigured) {
+    return amapConfigured ? MAP_PROVIDER_AMAP : MAP_PROVIDER_GOOGLE;
+  }
+  return browserLikelyInMainlandChina() ? MAP_PROVIDER_AMAP : MAP_PROVIDER_GOOGLE;
+}
+
+function currentMapProvider() {
+  if (!preferredMapProvider) preferredMapProvider = initialMapProvider();
+  return activeMapProvider || preferredMapProvider;
+}
+
+function mapCopyKey(base, provider = currentMapProvider()) {
+  return `${base}${provider === MAP_PROVIDER_AMAP ? "Amap" : "Google"}`;
+}
+
+function applyMapProviderCopy() {
+  const provider = currentMapProvider();
+  const selectKey = mapCopyKey("mapSelectButton", provider);
+  const regionKey = mapCopyKey("mapRegionLabel", provider);
+  locationPickerLabel.dataset.i18n = selectKey;
+  locationPickerLabel.textContent = t(selectKey);
+  locationMapElement.dataset.i18nAriaLabel = regionKey;
+  locationMapElement.setAttribute("aria-label", t(regionKey));
+  if (mapProviderConfigured(provider)) {
+    locationPickerButton.removeAttribute("title");
+  } else {
+    locationPickerButton.setAttribute("title", t(mapCopyKey("mapNotConfigured", provider)));
+  }
+}
+
+function setPreferredMapProvider(provider) {
+  if (provider !== MAP_PROVIDER_GOOGLE && provider !== MAP_PROVIDER_AMAP) return;
+  preferredMapProvider = provider;
+  applyMapProviderCopy();
+}
+
 function applyLanguage(language, { persist = true } = {}) {
   const nextLanguage = normalizeLanguage(language) || "zh";
   const nextMapsLocale = googleMapsLocale(nextLanguage);
@@ -706,8 +851,7 @@ function applyLanguage(language, { persist = true } = {}) {
   document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
     element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel));
   });
-  if (GOOGLE_MAPS_API_KEY) locationPickerButton.removeAttribute("title");
-  else locationPickerButton.setAttribute("title", t("mapNotConfigured"));
+  applyMapProviderCopy();
   updateLocationSelectionDisplay();
   document.title = t("pageTitle");
   languageButtons.forEach((button) => {
@@ -840,7 +984,228 @@ function loadGoogleMaps() {
   return googleMapsPromise;
 }
 
-function syncLocationSelectionLayer() {
+function loadAMap() {
+  if (!mapProviderConfigured(MAP_PROVIDER_AMAP)) {
+    return Promise.reject(new Error("amap_not_configured"));
+  }
+  if (window.AMap?.Map && window.AMap?.Geolocation) return Promise.resolve(window.AMap);
+  if (amapPromise) return amapPromise;
+
+  const amapSecurityConfig = { ...(window._AMapSecurityConfig || {}) };
+  if (AMAP_SERVICE_HOST) {
+    delete amapSecurityConfig.securityJsCode;
+    amapSecurityConfig.serviceHost = new URL(AMAP_SERVICE_HOST, window.location.origin)
+      .toString()
+      .replace(/\/$/, "");
+  } else {
+    delete amapSecurityConfig.serviceHost;
+    amapSecurityConfig.securityJsCode = AMAP_SECURITY_JS_CODE;
+  }
+  window._AMapSecurityConfig = amapSecurityConfig;
+
+  amapPromise = new Promise((resolve, reject) => {
+    const loadApi = () => {
+      const loader = window.AMapLoader;
+      if (!loader?.load) {
+        reject(new Error("amap_loader_unavailable"));
+        return;
+      }
+      loader
+        .load({
+          key: AMAP_API_KEY,
+          version: "2.0",
+          plugins: ["AMap.Geolocation"],
+        })
+        .then(resolve, reject);
+    };
+
+    if (window.AMapLoader?.load) {
+      loadApi();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "amap-loader-script";
+    if (CSP_NONCE) script.nonce = CSP_NONCE;
+    script.async = true;
+    script.onload = loadApi;
+    script.onerror = () => {
+      script.remove();
+      reject(new Error("amap_loader_failed"));
+    };
+    script.src = "https://webapi.amap.com/loader.js";
+    document.head.append(script);
+  })
+    .then((AMap) => {
+      if (!AMap?.Map) throw new Error("amap_load_failed");
+      return AMap;
+    })
+    .catch((error) => {
+      amapPromise = null;
+      throw error;
+    });
+
+  return amapPromise;
+}
+
+function isMainlandChinaAdcode(value) {
+  const adcode = String(value || "").trim();
+  if (!/^\d{6}$/.test(adcode)) return null;
+  const provinceCode = Number(adcode.slice(0, 2));
+  return MAINLAND_CHINA_ADCODE_PREFIXES.has(provinceCode);
+}
+
+function isMainlandChinaCityResult(result) {
+  const addressComponent = result?.addressComponent || {};
+  const adcodeMatch = isMainlandChinaAdcode(result?.adcode || addressComponent.adcode);
+  if (adcodeMatch !== null) return adcodeMatch;
+  const province = String(result?.province || addressComponent.province || "");
+  return MAINLAND_CHINA_PROVINCES.some((name) => province.includes(name));
+}
+
+async function detectPreferredMapProvider() {
+  if (!mapProviderConfigured(MAP_PROVIDER_AMAP)) return;
+  try {
+    const AMap = await loadAMap();
+    const result = await new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error("amap_city_timeout")), 6000);
+      const geolocation = new AMap.Geolocation({
+        showButton: false,
+        showMarker: false,
+        showCircle: false,
+      });
+      geolocation.getCityInfo((status, cityResult) => {
+        window.clearTimeout(timeout);
+        if (status === "complete" && cityResult) resolve(cityResult);
+        else reject(new Error("amap_city_unavailable"));
+      });
+    });
+    detectedAmapCity = result;
+    const provider = isMainlandChinaCityResult(result)
+      ? MAP_PROVIDER_AMAP
+      : mapProviderConfigured(MAP_PROVIDER_GOOGLE)
+        ? MAP_PROVIDER_GOOGLE
+        : MAP_PROVIDER_AMAP;
+    setPreferredMapProvider(provider);
+  } catch (_error) {
+    // Keep the browser-region choice when IP city detection is unavailable.
+  }
+}
+
+function outsideGcj02Coverage(location) {
+  return (
+    location.lng < 72.004 ||
+    location.lng > 137.8347 ||
+    location.lat < 0.8293 ||
+    location.lat > 55.8271
+  );
+}
+
+function gcj02LatitudeOffset(x, y) {
+  let offset = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y;
+  offset += 0.2 * Math.sqrt(Math.abs(x));
+  offset += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3;
+  offset += ((20 * Math.sin(y * Math.PI) + 40 * Math.sin((y / 3) * Math.PI)) * 2) / 3;
+  offset +=
+    ((160 * Math.sin((y / 12) * Math.PI) + 320 * Math.sin((y * Math.PI) / 30)) * 2) /
+    3;
+  return offset;
+}
+
+function gcj02LongitudeOffset(x, y) {
+  let offset = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y;
+  offset += 0.1 * Math.sqrt(Math.abs(x));
+  offset += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3;
+  offset += ((20 * Math.sin(x * Math.PI) + 40 * Math.sin((x / 3) * Math.PI)) * 2) / 3;
+  offset +=
+    ((150 * Math.sin((x / 12) * Math.PI) + 300 * Math.sin((x / 30) * Math.PI)) * 2) /
+    3;
+  return offset;
+}
+
+function wgs84ToGcj02(location) {
+  if (outsideGcj02Coverage(location)) return { ...location };
+  const earthRadius = 6378245;
+  const eccentricitySquared = 0.006693421622965943;
+  let latitudeOffset = gcj02LatitudeOffset(location.lng - 105, location.lat - 35);
+  let longitudeOffset = gcj02LongitudeOffset(location.lng - 105, location.lat - 35);
+  const latitudeRadians = (location.lat / 180) * Math.PI;
+  let magic = Math.sin(latitudeRadians);
+  magic = 1 - eccentricitySquared * magic * magic;
+  const squareRootMagic = Math.sqrt(magic);
+  latitudeOffset =
+    (latitudeOffset * 180) /
+    (((earthRadius * (1 - eccentricitySquared)) / (magic * squareRootMagic)) * Math.PI);
+  longitudeOffset =
+    (longitudeOffset * 180) /
+    ((earthRadius / squareRootMagic) * Math.cos(latitudeRadians) * Math.PI);
+  return {
+    lat: location.lat + latitudeOffset,
+    lng: location.lng + longitudeOffset,
+  };
+}
+
+function gcj02ToWgs84(location) {
+  if (outsideGcj02Coverage(location)) return { ...location };
+  let estimate = { ...location };
+  for (let iteration = 0; iteration < 6; iteration += 1) {
+    const converted = wgs84ToGcj02(estimate);
+    estimate = {
+      lat: estimate.lat - (converted.lat - location.lat),
+      lng: estimate.lng - (converted.lng - location.lng),
+    };
+  }
+  return estimate;
+}
+
+function locationFromAmapLngLat(value) {
+  if (!value) return null;
+  const longitude = Number(
+    Array.isArray(value) ? value[0] : typeof value.getLng === "function" ? value.getLng() : value.lng,
+  );
+  const latitude = Number(
+    Array.isArray(value) ? value[1] : typeof value.getLat === "function" ? value.getLat() : value.lat,
+  );
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { lat: latitude, lng: longitude };
+}
+
+function convertWgs84ToAmap(AMap, location) {
+  return new Promise((resolve) => {
+    const fallback = wgs84ToGcj02(location);
+    const timeout = window.setTimeout(() => resolve(fallback), 3000);
+    AMap.convertFrom([location.lng, location.lat], "gps", (status, result) => {
+      window.clearTimeout(timeout);
+      const converted = locationFromAmapLngLat(result?.locations?.[0]);
+      resolve(status === "complete" && converted ? converted : fallback);
+    });
+  });
+}
+
+function disposeLocationMap() {
+  if (locationMapProvider === MAP_PROVIDER_GOOGLE) {
+    locationSelectionLayer?.setMap(null);
+    if (window.google?.maps?.event && locationMap) {
+      window.google.maps.event.clearInstanceListeners(locationMap);
+    }
+  } else if (locationMapProvider === MAP_PROVIDER_AMAP) {
+    amapSelectionMarker?.setMap(null);
+    locationMap?.destroy();
+  }
+  locationMapElement.replaceChildren();
+  locationMap = null;
+  locationMapProvider = null;
+  locationSelectionLayer = null;
+  locationSelectionFeature = null;
+  amapSelectionMarker = null;
+}
+
+function prepareLocationMap(provider) {
+  if (locationMap && locationMapProvider !== provider) disposeLocationMap();
+  locationMapProvider = provider;
+}
+
+function syncGoogleLocationSelection() {
   const maps = window.google?.maps;
   if (!locationMap || !maps?.Data) return;
   if (!locationSelectionLayer) {
@@ -860,14 +1225,39 @@ function syncLocationSelectionLayer() {
     locationSelectionLayer.remove(locationSelectionFeature);
     locationSelectionFeature = null;
   }
-  if (!pendingLocation) return;
+  if (!pendingProviderLocation) return;
   locationSelectionFeature = new maps.Data.Feature({
-    geometry: new maps.Data.Point(new maps.LatLng(pendingLocation.lat, pendingLocation.lng)),
+    geometry: new maps.Data.Point(
+      new maps.LatLng(pendingProviderLocation.lat, pendingProviderLocation.lng),
+    ),
   });
   locationSelectionLayer.add(locationSelectionFeature);
 }
 
-function selectMapLocation(location) {
+function syncAmapLocationSelection(AMap) {
+  if (!locationMap) return;
+  if (!pendingProviderLocation) {
+    amapSelectionMarker?.setMap(null);
+    return;
+  }
+  const center = [pendingProviderLocation.lng, pendingProviderLocation.lat];
+  if (!amapSelectionMarker) {
+    amapSelectionMarker = new AMap.CircleMarker({
+      center,
+      radius: 9,
+      strokeColor: "#11191f",
+      strokeWeight: 2,
+      fillColor: "#d6f36a",
+      fillOpacity: 1,
+      zIndex: 120,
+    });
+  } else {
+    amapSelectionMarker.setCenter(center);
+  }
+  amapSelectionMarker.setMap(locationMap);
+}
+
+function selectMapLocation(location, providerLocation = location) {
   const latitude = Number(location.lat);
   const longitude = Number(location.lng);
   if (
@@ -881,13 +1271,20 @@ function selectMapLocation(location) {
     return;
   }
   pendingLocation = { lat: latitude, lng: longitude };
+  pendingProviderLocation = providerLocation;
   updateLocationSelectionDisplay();
-  syncLocationSelectionLayer();
+  if (locationMapProvider === MAP_PROVIDER_AMAP) {
+    syncAmapLocationSelection(window.AMap);
+  } else {
+    syncGoogleLocationSelection();
+  }
 }
 
-function initializeLocationMap(maps) {
+function initializeGoogleLocationMap(maps) {
+  prepareLocationMap(MAP_PROVIDER_GOOGLE);
   const existingLocation = pendingLocation;
   const center = existingLocation || { lat: 31.2304, lng: 121.4737 };
+  pendingProviderLocation = existingLocation;
   if (!locationMap) {
     locationMap = new maps.Map(locationMapElement, {
       center,
@@ -906,33 +1303,76 @@ function initializeLocationMap(maps) {
     locationMap.setZoom(existingLocation ? 12 : 3);
     maps.event.trigger(locationMap, "resize");
   }
-  syncLocationSelectionLayer();
+  syncGoogleLocationSelection();
+}
+
+async function initializeAmapLocationMap(AMap) {
+  prepareLocationMap(MAP_PROVIDER_AMAP);
+  const existingLocation = pendingLocation;
+  const convertedLocation = existingLocation
+    ? await convertWgs84ToAmap(AMap, existingLocation)
+    : null;
+  const detectedCenter = locationFromAmapLngLat(detectedAmapCity?.center);
+  const center = convertedLocation || detectedCenter || { lat: 31.2304, lng: 121.4737 };
+  const zoom = existingLocation ? 12 : detectedCenter ? 10 : 4;
+  pendingProviderLocation = convertedLocation;
+  const amapCenter = [center.lng, center.lat];
+
+  if (!locationMap) {
+    locationMap = new AMap.Map(locationMapElement, {
+      center: amapCenter,
+      zoom,
+      viewMode: "2D",
+      resizeEnable: true,
+    });
+    locationMap.on("click", (event) => {
+      const amapLocation = locationFromAmapLngLat(event.lnglat);
+      if (!amapLocation) return;
+      selectMapLocation(gcj02ToWgs84(amapLocation), amapLocation);
+    });
+  } else {
+    locationMap.setZoomAndCenter(zoom, amapCenter);
+    locationMap.resize();
+  }
+  syncAmapLocationSelection(AMap);
 }
 
 async function openLocationDialog() {
-  if (!GOOGLE_MAPS_API_KEY) {
-    showTranslationToast("mapNotConfigured", true);
+  const provider = currentMapProvider();
+  if (!mapProviderConfigured(provider)) {
+    showTranslationToast(mapCopyKey("mapNotConfigured", provider), true);
     return;
   }
 
+  activeMapProvider = provider;
+  applyMapProviderCopy();
   locationDialogGeneration += 1;
   const generation = locationDialogGeneration;
   pendingLocation = coordinatesFromInputs();
+  pendingProviderLocation = null;
   updateLocationSelectionDisplay();
-  setLocationMapStatus("mapLoading");
+  const loadingKey = mapCopyKey("mapLoading", provider);
+  setLocationMapStatus(loadingKey);
   if (!locationDialog.open) locationDialog.showModal();
   document.body.classList.add("modal-open");
 
   try {
-    const maps = await loadGoogleMaps();
+    if (provider === MAP_PROVIDER_AMAP) {
+      const AMap = await loadAMap();
+      if (!locationDialog.open || generation !== locationDialogGeneration) return;
+      await initializeAmapLocationMap(AMap);
+    } else {
+      const maps = await loadGoogleMaps();
+      if (!locationDialog.open || generation !== locationDialogGeneration) return;
+      if (maps.importLibrary) await maps.importLibrary("maps");
+      if (!locationDialog.open || generation !== locationDialogGeneration) return;
+      initializeGoogleLocationMap(maps);
+    }
     if (!locationDialog.open || generation !== locationDialogGeneration) return;
-    if (maps.importLibrary) await maps.importLibrary("maps");
-    if (!locationDialog.open || generation !== locationDialogGeneration) return;
-    initializeLocationMap(maps);
-    setLocationMapStatus("mapLoading", { hidden: true });
+    setLocationMapStatus(loadingKey, { hidden: true });
   } catch (_error) {
     if (!locationDialog.open || generation !== locationDialogGeneration) return;
-    setLocationMapStatus("mapLoadFailure", { error: true });
+    setLocationMapStatus(mapCopyKey("mapLoadFailure", provider), { error: true });
   }
 }
 
@@ -1505,7 +1945,10 @@ function bindEvents() {
   locationDialog.addEventListener("close", () => {
     locationDialogGeneration += 1;
     document.body.classList.remove("modal-open");
+    activeMapProvider = null;
     pendingLocation = null;
+    pendingProviderLocation = null;
+    applyMapProviderCopy();
     updateLocationSelectionDisplay();
   });
   emailInput.addEventListener("change", () => {
@@ -1542,6 +1985,7 @@ updateClock();
 window.setInterval(updateClock, 1000);
 
 async function init() {
+  void detectPreferredMapProvider();
   await loadOptions();
   refreshHealth();
 }

@@ -60,6 +60,9 @@ continents = ["Europe"]
     assert config.wca.page_size == 100
     assert config.log_dir == (tmp_path / "logs").resolve()
     assert config.google_maps_api_key is None
+    assert config.amap_api_key is None
+    assert config.amap_security_js_code is None
+    assert config.amap_service_host is None
 
 
 def test_load_config_reads_optional_google_maps_api_key(tmp_path: Path) -> None:
@@ -88,6 +91,118 @@ google_maps_api_key = 123
     )
 
     with pytest.raises(ConfigurationError, match="google_maps_api_key must be a string"):
+        load_config(config_path)
+
+
+def test_load_config_reads_optional_amap_credentials(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        """
+[web]
+amap_api_key = "  amap-browser-key  "
+amap_security_js_code = "  amap-security-code  "
+""",
+    )
+
+    config = load_config(config_path)
+
+    assert config.amap_api_key == "amap-browser-key"
+    assert config.amap_security_js_code == "amap-security-code"
+
+
+@pytest.mark.parametrize(
+    "setting",
+    [
+        'amap_api_key = "amap-browser-key"',
+        'amap_security_js_code = "amap-security-code"',
+    ],
+)
+def test_amap_credentials_must_be_configured_together(tmp_path: Path, setting: str) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        f"""
+[web]
+{setting}
+""",
+    )
+
+    with pytest.raises(ConfigurationError, match=r"required|requires"):
+        load_config(config_path)
+
+
+@pytest.mark.parametrize("setting", ["amap_api_key = 123", "amap_security_js_code = 123"])
+def test_amap_credentials_must_be_strings(tmp_path: Path, setting: str) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        f"""
+[web]
+{setting}
+""",
+    )
+
+    with pytest.raises(ConfigurationError, match="must be a string"):
+        load_config(config_path)
+
+
+def test_load_config_reads_amap_service_host(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        """
+[web]
+amap_api_key = "amap-browser-key"
+amap_service_host = "  /_AMapService/  "
+""",
+    )
+
+    config = load_config(config_path)
+
+    assert config.amap_api_key == "amap-browser-key"
+    assert config.amap_service_host == "/_AMapService"
+    assert config.amap_security_js_code is None
+
+
+@pytest.mark.parametrize(
+    "service_host",
+    [
+        "https://maps.example.com/_AMapService",
+        "//maps.example.com",
+        "/",
+        "/proxy",
+        "/_AMapService?q=1",
+    ],
+)
+def test_amap_service_host_must_be_a_root_relative_path(tmp_path: Path, service_host: str) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        f"""
+[web]
+amap_api_key = "amap-browser-key"
+amap_service_host = "{service_host}"
+""",
+    )
+
+    with pytest.raises(ConfigurationError, match="root-relative path"):
+        load_config(config_path)
+
+
+def test_amap_security_modes_are_mutually_exclusive(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        """
+[web]
+amap_api_key = "amap-browser-key"
+amap_service_host = "/_AMapService"
+amap_security_js_code = "amap-security-code"
+""",
+    )
+
+    with pytest.raises(ConfigurationError, match="requires exactly one"):
         load_config(config_path)
 
 

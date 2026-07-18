@@ -10,6 +10,13 @@ max_emails_per_run = 100
 # Optional: enables the Google Maps location picker in the browser subscription form.
 # Browser API keys are public; restrict this key by HTTP referrer and to Maps JavaScript API.
 google_maps_api_key = ""
+# Optional: enables AMap for users detected in mainland China.
+# Set the Web (JS API) key and exactly one security mode below.
+amap_api_key = ""
+# Recommended for production: a same-origin proxy path that keeps securityJsCode server-side.
+amap_service_host = ""
+# Development fallback only: this value is sent to the browser in plaintext.
+amap_security_js_code = ""
 
 [wca]
 base_url = "https://www.worldcubeassociation.org"

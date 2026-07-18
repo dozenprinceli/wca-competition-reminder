@@ -108,6 +108,9 @@ class AppConfig:
     recipients: tuple[RecipientConfig, ...]
     admins: tuple[AdminConfig, ...] = ()
     google_maps_api_key: str | None = None
+    amap_api_key: str | None = None
+    amap_security_js_code: str | None = None
+    amap_service_host: str | None = None
 
 
 def _table(document: dict[str, object], name: str) -> dict[str, object]:
@@ -287,6 +290,32 @@ def load_config(path: Path) -> AppConfig:
     if not isinstance(web_document, dict):
         raise ConfigurationError("invalid [web] table")
     google_maps_api_key = _optional_string(web_document, "google_maps_api_key")
+    amap_api_key = _optional_string(web_document, "amap_api_key")
+    amap_security_js_code = _optional_string(web_document, "amap_security_js_code")
+    amap_service_host = _optional_string(web_document, "amap_service_host")
+    if amap_service_host is not None:
+        amap_service_host = amap_service_host.rstrip("/")
+        parsed_service_host = urlsplit(amap_service_host)
+        if (
+            not amap_service_host.startswith("/")
+            or amap_service_host.startswith("//")
+            or not amap_service_host.endswith("/_AMapService")
+            or parsed_service_host.query
+            or parsed_service_host.fragment
+        ):
+            raise ConfigurationError(
+                "web.amap_service_host must be a root-relative path ending in /_AMapService"
+            )
+    amap_security_modes = sum(
+        value is not None for value in (amap_security_js_code, amap_service_host)
+    )
+    if amap_api_key is None and amap_security_modes:
+        raise ConfigurationError("web.amap_api_key is required when AMap security is configured")
+    if amap_api_key is not None and amap_security_modes != 1:
+        raise ConfigurationError(
+            "web.amap_api_key requires exactly one of web.amap_service_host or "
+            "web.amap_security_js_code"
+        )
 
     wca_document = _table(document, "wca")
     base_url = _string(wca_document, "base_url", "https://www.worldcubeassociation.org").rstrip("/")
@@ -414,6 +443,9 @@ def load_config(path: Path) -> AppConfig:
         recipients=tuple(recipients),
         admins=tuple(admins),
         google_maps_api_key=google_maps_api_key,
+        amap_api_key=amap_api_key,
+        amap_security_js_code=amap_security_js_code,
+        amap_service_host=amap_service_host,
     )
 
 

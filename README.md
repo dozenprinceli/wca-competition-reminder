@@ -36,8 +36,7 @@ it also includes the straight-line distance; otherwise the distance is shown as 
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
 - An SMTP account with STARTTLS (usually port `587`) or implicit TLS (usually port `465`)
-- Optional: a Google Maps Platform browser API key with Maps JavaScript API enabled for the
-  location picker
+- Optional: Google Maps Platform and AMap Web (JS API) credentials for the location picker
 - Node.js and [PM2](https://pm2.keymetrics.io/) for the production deployment described below
 
 ## Quick Start
@@ -62,13 +61,17 @@ Edit `config.toml`. At minimum:
 3. Optionally add `[[recipients]]` entries for recipients managed in TOML. The list may be
    omitted when all recipients will use the browser subscription desk.
 4. Add at least one `[[admins]]` entry with a unique username and strong password.
-5. To enable Google Maps location selection, set a browser API key in `[web]`.
+5. To enable map location selection, configure Google Maps and/or AMap in `[web]`.
 
 See [`config.example.toml`](config.example.toml) for every available setting.
 
 ```toml
 [web]
 google_maps_api_key = "your-browser-api-key"
+amap_api_key = "your-amap-web-key"
+amap_service_host = "/_AMapService"
+# Local-development alternative to amap_service_host (do not set both):
+# amap_security_js_code = "your-amap-security-code"
 
 [[admins]]
 username = "admin"
@@ -139,12 +142,24 @@ Recipient coordinates are optional and must either both be set or both be empty.
 positive maximum distance requires coordinates. Cancellation blocks pending deliveries for
 that address. Changes apply to competitions that have not already been queued.
 
-When `[web].google_maps_api_key` is configured, the coordinate fields include a Google Maps
-picker. Clicking the map and confirming the selection fills both coordinates to six decimal
-places. Enable the [Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/cloud-setup)
-for the Google Cloud project, then apply [HTTP referrer and API restrictions](https://developers.google.com/maps/api-security-best-practices)
-for the deployed domains. Browser API keys are sent to clients and must not be treated as
-server-side secrets.
+The coordinate fields use the configured map provider to fill both coordinates to six decimal
+places. When both providers are available, the browser first uses its explicit region/time zone,
+then verifies the IP city with AMap's permission-free `Geolocation.getCityInfo()`: users detected
+in mainland China see AMap, while other users see Google Maps. If IP detection fails, the initial
+browser-region choice remains in place; if only one provider is configured, that provider is used.
+
+For Google Maps, enable the [Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/cloud-setup)
+and apply [HTTP referrer and API restrictions](https://developers.google.com/maps/api-security-best-practices).
+For AMap, create a Web (JS API) key and follow the official [JS API Loader 2.0](https://lbs.amap.com/api/javascript-api-v2/guide/abc/load)
+and [security-key](https://lbs.amap.com/api/javascript-api-v2/guide/abc/jscode) guidance. Production
+deployments should keep `securityJsCode` in a same-origin reverse proxy and set its fixed path as
+`amap_service_host` (for example, `/_AMapService`). The plaintext `amap_security_js_code` option is
+provided for local development only and is sent to the client. The two AMap security modes are
+mutually exclusive.
+
+AMap renders mainland-China coordinates as GCJ-02. Existing WGS84 form coordinates are converted
+with AMap's official `convertFrom(..., "gps")` API for display; clicked GCJ-02 points are converted
+back before storage so the existing distance calculations keep their coordinate convention.
 
 The browser's country and continent choices are loaded from the WCA country catalog through
 the server-side `/api/options` endpoint and cached for six hours. Keep the Web service bound

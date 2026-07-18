@@ -47,10 +47,11 @@ ADMIN_LOGIN_WINDOW_SECONDS = 5 * 60
 ADMIN_COOKIE_NAME = "wca_admin_session"
 APPLICATION_BASE_PATH_PLACEHOLDER = "__WCA_APPLICATION_BASE_PATH__"
 GOOGLE_MAPS_API_KEY_PLACEHOLDER = "__WCA_GOOGLE_MAPS_API_KEY__"
+AMAP_API_KEY_PLACEHOLDER = "__WCA_AMAP_API_KEY__"
+AMAP_SECURITY_JS_CODE_PLACEHOLDER = "__WCA_AMAP_SECURITY_JS_CODE__"
+AMAP_SERVICE_HOST_PLACEHOLDER = "__WCA_AMAP_SERVICE_HOST__"
 CSP_NONCE_PLACEHOLDER = "__WCA_CSP_NONCE__"
-FORWARDED_PREFIX_PATTERN = re.compile(
-    r"/(?:[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*)?"
-)
+FORWARDED_PREFIX_PATTERN = re.compile(r"/(?:[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*)?")
 STATIC_FILES = {
     "/": "index.html",
     "/index.html": "index.html",
@@ -860,7 +861,9 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             return
         csp_nonce: str | None = None
         if path.suffix.casefold() == ".html":
-            if path.name == "index.html" and self._settings.config.google_maps_api_key:
+            if path.name == "index.html" and (
+                self._settings.config.google_maps_api_key or self._settings.config.amap_api_key
+            ):
                 csp_nonce = secrets.token_urlsafe(18)
             body = body.replace(
                 APPLICATION_BASE_PATH_PLACEHOLDER.encode("ascii"),
@@ -868,9 +871,21 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             )
             body = body.replace(
                 GOOGLE_MAPS_API_KEY_PLACEHOLDER.encode("ascii"),
-                escape(self._settings.config.google_maps_api_key or "", quote=True).encode(
+                escape(self._settings.config.google_maps_api_key or "", quote=True).encode("utf-8"),
+            )
+            body = body.replace(
+                AMAP_API_KEY_PLACEHOLDER.encode("ascii"),
+                escape(self._settings.config.amap_api_key or "", quote=True).encode("utf-8"),
+            )
+            body = body.replace(
+                AMAP_SECURITY_JS_CODE_PLACEHOLDER.encode("ascii"),
+                escape(self._settings.config.amap_security_js_code or "", quote=True).encode(
                     "utf-8"
                 ),
+            )
+            body = body.replace(
+                AMAP_SERVICE_HOST_PLACEHOLDER.encode("ascii"),
+                escape(self._settings.config.amap_service_host or "", quote=True).encode("utf-8"),
             )
             body = body.replace(
                 CSP_NONCE_PLACEHOLDER.encode("ascii"),
@@ -914,15 +929,52 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             "strict-origin-when-cross-origin" if csp_nonce else "same-origin",
         )
         if csp_nonce:
+            style_sources = ["'self'", f"'nonce-{csp_nonce}'"]
+            connect_sources = ["'self'"]
+            image_sources = ["'self'"]
+            frame_sources: list[str] = []
+            font_sources = ["'self'"]
+            if self._settings.config.google_maps_api_key:
+                style_sources.append("https://fonts.googleapis.com")
+                connect_sources.extend(
+                    [
+                        "https://*.googleapis.com",
+                        "https://*.google.com",
+                        "https://*.gstatic.com",
+                    ]
+                )
+                image_sources.extend(
+                    [
+                        "https://*.googleapis.com",
+                        "https://*.gstatic.com",
+                        "https://*.google.com",
+                        "https://*.googleusercontent.com",
+                    ]
+                )
+                frame_sources.append("https://*.google.com")
+                font_sources.append("https://fonts.gstatic.com")
+            if self._settings.config.amap_api_key:
+                amap_sources = ["https://*.amap.com", "https://*.autonavi.com"]
+                style_sources.extend(amap_sources)
+                connect_sources.extend(amap_sources)
+                image_sources.extend(amap_sources)
+                font_sources.extend(amap_sources)
+            style_element_sources = [
+                source for source in style_sources if not source.startswith("'nonce-")
+            ]
+            style_element_sources.append("'unsafe-inline'")
+            connect_sources.extend(["data:", "blob:"])
+            image_sources.extend(["data:", "blob:"])
             content_security_policy = (
                 "default-src 'self'; "
                 f"script-src 'nonce-{csp_nonce}' 'strict-dynamic' https: 'unsafe-eval' blob:; "
-                f"style-src 'self' 'nonce-{csp_nonce}' https://fonts.googleapis.com; "
-                "connect-src 'self' https://*.googleapis.com https://*.google.com "
-                "https://*.gstatic.com data: blob:; "
-                "img-src 'self' https://*.googleapis.com https://*.gstatic.com "
-                "https://*.google.com https://*.googleusercontent.com data: blob:; "
-                "frame-src https://*.google.com; font-src 'self' https://fonts.gstatic.com; "
+                f"style-src {' '.join(style_sources)}; "
+                f"style-src-elem {' '.join(style_element_sources)}; "
+                "style-src-attr 'unsafe-inline'; "
+                f"connect-src {' '.join(connect_sources)}; "
+                f"img-src {' '.join(image_sources)}; "
+                f"frame-src {' '.join(frame_sources) or "'none'"}; "
+                f"font-src {' '.join(font_sources)}; "
                 "worker-src blob:; base-uri 'none'; form-action 'self'"
             )
         else:
