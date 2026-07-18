@@ -165,6 +165,19 @@ The browser's country and continent choices are loaded from the WCA country cata
 the server-side `/api/options` endpoint and cached for six hours. Keep the Web service bound
 to localhost when placing it behind a reverse proxy, and terminate HTTPS at that proxy.
 
+The reverse proxy must overwrite the client forwarding headers so audit records and admin
+login rate limits use the public client address instead of `127.0.0.1`. For Nginx, include:
+
+```nginx
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+The Web service only accepts these IP headers from a direct loopback connection. It uses the
+rightmost `X-Forwarded-For` address, with `X-Real-IP` as a fallback, so keep the service bound
+to localhost and have the nearest proxy overwrite or append these headers.
+
 ### Admin console
 
 Open `http://127.0.0.1:8080/admin` and sign in with any `[[admins]]` username/password pair

@@ -126,6 +126,16 @@ Google 地图需要启用 [Maps JavaScript API](https://developers.google.com/ma
 
 国家、大洲选项由服务端的 `/api/options` 接口从 WCA 目录载入并缓存 6 小时。通过反向代理公开服务时，建议 Web 服务仍只监听本机地址，并在代理层终止 HTTPS。
 
+反向代理必须覆盖客户端转发请求头，行为日志和管理员登录限流才能记录公网客户端地址，而不是 `127.0.0.1`。Nginx 配置中应包含：
+
+```nginx
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+Web 服务仅在直接连接来自本机回环地址时接受这些 IP 请求头，并使用最右侧的 `X-Forwarded-For` 地址，以 `X-Real-IP` 作为后备。因此应保持服务仅监听本机地址，并由最近一层代理覆盖或追加这些请求头。
+
 ### 管理控制台
 
 打开 `http://127.0.0.1:8080/admin`，使用 `config.toml` 中任意一组

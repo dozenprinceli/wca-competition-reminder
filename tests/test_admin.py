@@ -50,6 +50,52 @@ def start_admin_server(tmp_path: Path):
     return server, thread, clock
 
 
+def test_client_ip_resolution_only_trusts_loopback_proxy() -> None:
+    assert (
+        web._resolve_client_ip(
+            "127.0.0.1",
+            ("203.0.113.9, 198.51.100.24",),
+            "192.0.2.15",
+        )
+        == "198.51.100.24"
+    )
+    assert web._resolve_client_ip("::1", (), "2001:db8::10") == "2001:db8::10"
+    assert (
+        web._resolve_client_ip(
+            "192.0.2.20",
+            ("198.51.100.24",),
+            "203.0.113.9",
+        )
+        == "192.0.2.20"
+    )
+    assert web._resolve_client_ip("127.0.0.1", ("invalid",), None) == "127.0.0.1"
+
+
+def test_activity_and_http_logs_use_forwarded_client_ip(tmp_path: Path, caplog) -> None:
+    caplog.set_level(logging.INFO, logger=web.__name__)
+    server, thread, clock = start_admin_server(tmp_path)
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        connection.request(
+            "GET",
+            "/",
+            headers={"X-Forwarded-For": "203.0.113.9, 198.51.100.24"},
+        )
+        response = connection.getresponse()
+        response.read()
+        assert response.status == 200
+
+        with StateStore(server.settings.config.state_path) as state:
+            activity = state.activity_logs(now=clock.current, action="subscription_page_view")
+        assert activity["items"][0]["client_ip"] == "198.51.100.24"
+        assert "http client=198.51.100.24 method=GET path=/ status=200" in caplog.text
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_admin_page_authentication_snapshot_and_logout(
     tmp_path: Path,
     caplog,
@@ -376,6 +422,7 @@ def test_admin_login_is_disabled_without_configured_accounts(tmp_path: Path) -> 
 def test_admin_login_is_rate_limited_after_five_failures(tmp_path: Path) -> None:
     server, thread, clock = start_admin_server(tmp_path)
     connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    blocked_client_headers = {"X-Forwarded-For": "198.51.100.30"}
     try:
         for _ in range(web.ADMIN_LOGIN_ATTEMPTS):
             response, _ = request_json(
@@ -383,6 +430,7 @@ def test_admin_login_is_rate_limited_after_five_failures(tmp_path: Path) -> None
                 "POST",
                 "/api/admin/login",
                 {"username": "operator", "password": "wrong-secret"},
+                headers=blocked_client_headers,
             )
             assert response.status == 401
 
@@ -391,10 +439,21 @@ def test_admin_login_is_rate_limited_after_five_failures(tmp_path: Path) -> None
             "POST",
             "/api/admin/login",
             {"username": "operator", "password": "admin-secret"},
+            headers=blocked_client_headers,
         )
         assert response.status == 429
         assert response.getheader("Retry-After") == str(web.ADMIN_LOGIN_WINDOW_SECONDS)
         assert body["retry_after_seconds"] == web.ADMIN_LOGIN_WINDOW_SECONDS
+
+        response, body = request_json(
+            connection,
+            "POST",
+            "/api/admin/login",
+            {"username": "operator", "password": "admin-secret"},
+            headers={"X-Forwarded-For": "198.51.100.31"},
+        )
+        assert response.status == 200
+        assert body["authenticated"] is True
 
         clock.current += timedelta(seconds=web.ADMIN_LOGIN_WINDOW_SECONDS)
         response, body = request_json(
@@ -402,6 +461,7 @@ def test_admin_login_is_rate_limited_after_five_failures(tmp_path: Path) -> None
             "POST",
             "/api/admin/login",
             {"username": "operator", "password": "admin-secret"},
+            headers=blocked_client_headers,
         )
         assert response.status == 200
         assert body["authenticated"] is True

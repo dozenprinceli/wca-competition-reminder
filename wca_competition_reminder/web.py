@@ -16,6 +16,7 @@ from html import escape
 from http import HTTPStatus
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from ipaddress import IPv4Address, IPv6Address, ip_address
 from pathlib import Path
 from threading import Lock
 from time import monotonic
@@ -68,6 +69,44 @@ STATIC_FILES = {
 VerificationSender = Callable[[str, str, datetime], None]
 Clock = Callable[[], datetime]
 CodeFactory = Callable[[], str]
+IPAddress = IPv4Address | IPv6Address
+
+
+def _parse_ip_address(value: str | None) -> IPAddress | None:
+    if value is None:
+        return None
+    try:
+        return ip_address(value.strip())
+    except ValueError:
+        return None
+
+
+def _is_loopback_address(address: IPAddress) -> bool:
+    if address.is_loopback:
+        return True
+    return isinstance(address, IPv6Address) and (
+        address.ipv4_mapped is not None and address.ipv4_mapped.is_loopback
+    )
+
+
+def _resolve_client_ip(
+    peer_ip: str,
+    forwarded_for: tuple[str, ...] = (),
+    real_ip: str | None = None,
+) -> str:
+    peer_address = _parse_ip_address(peer_ip)
+    normalized_peer = str(peer_address) if peer_address is not None else peer_ip[:128]
+    if peer_address is None or not _is_loopback_address(peer_address):
+        return normalized_peer
+
+    # The nearest reverse proxy appends the address it observed at the right edge.
+    if forwarded_for:
+        forwarded_address = _parse_ip_address(forwarded_for[-1].rsplit(",", 1)[-1])
+        if forwarded_address is not None:
+            return str(forwarded_address)
+
+    real_address = _parse_ip_address(real_ip)
+    return str(real_address) if real_address is not None else normalized_peer
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,6 +346,13 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
     @property
     def _reminder_server(self) -> ReminderHttpServer:
         return cast(ReminderHttpServer, self.server)
+
+    def _client_ip(self) -> str:
+        return _resolve_client_ip(
+            self.client_address[0],
+            tuple(self.headers.get_all("X-Forwarded-For", [])),
+            self.headers.get("X-Real-IP"),
+        )
 
     def do_OPTIONS(self) -> None:
         self.send_response(HTTPStatus.NO_CONTENT)
@@ -752,7 +798,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
 
         username = payload.get("username")
         password = payload.get("password")
-        client = self.client_address[0]
+        client = self._client_ip()
         retry_after = self._reminder_server.admin_login_retry_after(client)
         if retry_after:
             self._audit(
@@ -852,7 +898,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
         if FORWARDED_PREFIX_PATTERN.fullmatch(forwarded_prefix) is None:
             LOGGER.warning(
                 "ignored invalid forwarded prefix client=%s",
-                self.address_string(),
+                self._client_ip(),
             )
             return ""
         return forwarded_prefix
@@ -944,10 +990,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                 for key, item in list(value.items())[:40]
             }
         if isinstance(value, list | tuple | set | frozenset):
-            return [
-                cls._audit_detail_value(item, depth=depth + 1)
-                for item in list(value)[:50]
-            ]
+            return [cls._audit_detail_value(item, depth=depth + 1) for item in list(value)[:50]]
         return str(value)[:500]
 
     def _audit(
@@ -958,6 +1001,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
         level: int = logging.INFO,
         **details: object,
     ) -> None:
+        client_ip = self._client_ip()
         suffix = "".join(
             f" {key}={self._safe_log_value(mask_email(str(value)) if key == 'email' else value)}"
             for key, value in details.items()
@@ -968,7 +1012,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             "audit action=%s outcome=%s client=%s%s",
             self._safe_log_value(action),
             self._safe_log_value(outcome),
-            self._safe_log_value(self.client_address[0]),
+            self._safe_log_value(client_ip),
             suffix,
         )
         email_value = details.get("email")
@@ -987,7 +1031,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                     action=action,
                     outcome=outcome,
                     email=email or None,
-                    client_ip=self.client_address[0],
+                    client_ip=client_ip,
                     method=self.command,
                     path=urlsplit(self.path).path,
                     user_agent=user_agent,
@@ -1165,7 +1209,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
         status = args[1] if len(args) > 1 else "-"
         LOGGER.info(
             "http client=%s method=%s path=%s status=%s",
-            self.address_string(),
+            self._client_ip(),
             self.command,
             urlsplit(self.path).path,
             status,
