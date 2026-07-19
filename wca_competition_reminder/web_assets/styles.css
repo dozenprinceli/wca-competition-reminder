@@ -39,6 +39,7 @@ body.modal-open {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -466,6 +467,7 @@ h1 em {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   padding: 11px 12px;
@@ -481,6 +483,11 @@ input {
   min-height: 44px;
 }
 
+select {
+  min-height: 44px;
+  cursor: pointer;
+}
+
 textarea {
   min-height: 91px;
   resize: vertical;
@@ -493,6 +500,7 @@ textarea::placeholder {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   background: var(--white);
   border-color: var(--cyan);
@@ -500,6 +508,7 @@ textarea:focus {
 }
 
 input[aria-invalid="true"],
+select[aria-invalid="true"],
 textarea[aria-invalid="true"] {
   border-color: var(--coral);
   box-shadow: 4px 4px 0 rgba(239, 120, 95, 0.14);

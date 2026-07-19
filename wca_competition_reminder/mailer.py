@@ -7,9 +7,15 @@ from datetime import datetime
 from email.headerregistry import Address
 from email.message import EmailMessage
 from email.utils import format_datetime, make_msgid
+from pathlib import Path
 
 from wca_competition_reminder.config import SmtpConfig
-from wca_competition_reminder.models import Delivery
+from wca_competition_reminder.email_templates import (
+    DEFAULT_EMAIL_TEMPLATES_PATH,
+    EmailTemplateCatalog,
+    load_email_templates,
+)
+from wca_competition_reminder.models import DEFAULT_NOTIFICATION_LANGUAGE, Delivery
 from wca_competition_reminder.utils import mask_email
 
 
@@ -21,10 +27,19 @@ class DeliverySendError(RuntimeError):
 
 
 class SmtpMailer:
-    def __init__(self, config: SmtpConfig, password: str | None) -> None:
+    def __init__(
+        self,
+        config: SmtpConfig,
+        password: str | None,
+        *,
+        template_catalog: EmailTemplateCatalog | None = None,
+        templates_path: Path | None = None,
+    ) -> None:
         self._config = config
         self._password = password
         self._connection: smtplib.SMTP | smtplib.SMTP_SSL | None = None
+        self._template_catalog = template_catalog
+        self._templates_path = templates_path or DEFAULT_EMAIL_TEMPLATES_PATH
 
     def close(self) -> None:
         if self._connection is None:
@@ -65,10 +80,18 @@ class SmtpMailer:
         recipient_email: str,
         code: str,
         created_at: datetime,
+        notification_language: str = DEFAULT_NOTIFICATION_LANGUAGE,
     ) -> None:
         domain = self._config.from_address.rpartition("@")[2] or "wca-reminder.local"
+        templates = self._template_catalog or load_email_templates(self._templates_path)
+        rendered = templates.render_verification(
+            notification_language,
+            subject_values={"code": code, "validity_minutes": 5},
+            text_values={"code": code, "validity_minutes": 5},
+            html_values={"code": code, "validity_minutes": 5},
+        )
         message = EmailMessage()
-        message["Subject"] = "[WCA 比赛提醒] 注册验证码"
+        message["Subject"] = rendered.subject
         message["From"] = Address(
             display_name=self._config.from_name,
             addr_spec=self._config.from_address,
@@ -76,17 +99,8 @@ class SmtpMailer:
         message["To"] = Address(addr_spec=recipient_email)
         message["Message-ID"] = make_msgid(domain=domain)
         message["Date"] = format_datetime(created_at)
-        message.set_content(
-            "你正在注册 WCA 比赛邮件提醒。\n\n"
-            f"验证码：{code}\n"
-            "验证码 5 分钟内有效。若非本人操作，请忽略这封邮件。"
-        )
-        message.add_alternative(
-            "<p>你正在注册 WCA 比赛邮件提醒。</p>"
-            f'<p style="font-size:24px;font-weight:bold;letter-spacing:4px">{code}</p>'
-            "<p>验证码 5 分钟内有效。若非本人操作，请忽略这封邮件。</p>",
-            subtype="html",
-        )
+        message.set_content(rendered.text_body)
+        message.add_alternative(rendered.html_body, subtype="html")
         self._send_message(message, recipient_email)
 
     def _send_message(self, message: EmailMessage, recipient_email: str) -> None:

@@ -1,17 +1,78 @@
+from __future__ import annotations
+
 import hashlib
 import html
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from wca_competition_reminder.config import RecipientConfig
 from wca_competition_reminder.distance import coordinates_are_valid, haversine_km
-from wca_competition_reminder.events import format_event_ids, ordered_official_event_ids
+from wca_competition_reminder.email_templates import (
+    DEFAULT_EMAIL_TEMPLATES_PATH,
+    EmailTemplateCatalog,
+    load_email_templates,
+)
+from wca_competition_reminder.events import OFFICIAL_EVENTS, ordered_official_event_ids
 from wca_competition_reminder.models import CompetitionDetails, DeliveryDraft
 
+_EVENT_NAMES = {
+    "zh": dict(OFFICIAL_EVENTS),
+    "en": {
+        "333": "3x3 Cube",
+        "222": "2x2 Cube",
+        "444": "4x4 Cube",
+        "555": "5x5 Cube",
+        "666": "6x6 Cube",
+        "777": "7x7 Cube",
+        "333bf": "3x3 Blindfolded",
+        "333fm": "3x3 Fewest Moves",
+        "333oh": "3x3 One-Handed",
+        "clock": "Clock",
+        "minx": "Megaminx",
+        "pyram": "Pyraminx",
+        "skewb": "Skewb",
+        "sq1": "Square-1",
+        "444bf": "4x4 Blindfolded",
+        "555bf": "5x5 Blindfolded",
+        "333mbf": "3x3 Multi-Blind",
+    },
+    "ja": {
+        "333": "3x3キューブ",
+        "222": "2x2キューブ",
+        "444": "4x4キューブ",
+        "555": "5x5キューブ",
+        "666": "6x6キューブ",
+        "777": "7x7キューブ",
+        "333bf": "3x3目隠し",
+        "333fm": "3x3最少手数",
+        "333oh": "3x3片手",
+        "clock": "クロック",
+        "minx": "メガミンクス",
+        "pyram": "ピラミンクス",
+        "skewb": "スキューブ",
+        "sq1": "スクエア1",
+        "444bf": "4x4目隠し",
+        "555bf": "5x5目隠し",
+        "333mbf": "3x3マルチブラインド",
+    },
+}
 
-def _date_range(details: CompetitionDetails) -> str:
+_TEXT_FALLBACKS = {
+    "zh": {"unknown": "未提供", "unknown_country": "未知国家/地区", "unavailable": "暂不可用"},
+    "en": {
+        "unknown": "Not provided",
+        "unknown_country": "Unknown country/region",
+        "unavailable": "Temporarily unavailable",
+    },
+    "ja": {"unknown": "未提供", "unknown_country": "不明な国・地域", "unavailable": "一時利用不可"},
+}
+
+
+def _date_range(details: CompetitionDetails, language: str = "zh") -> str:
     if details.start_date == details.end_date:
         return details.start_date.isoformat()
-    return f"{details.start_date.isoformat()} 至 {details.end_date.isoformat()}"
+    separator = {"zh": " 至 ", "ja": "～"}.get(language, " - ")
+    return f"{details.start_date.isoformat()}{separator}{details.end_date.isoformat()}"
 
 
 def _message_id(competition_id: str, recipient_email: str, from_address: str) -> str:
@@ -21,11 +82,14 @@ def _message_id(competition_id: str, recipient_email: str, from_address: str) ->
     return f"<wca-{digest}@{domain}>"
 
 
-def _html_row(label: str, value: str, *, strong: bool = False) -> str:
-    escaped_value = html.escape(value)
-    if strong:
-        escaped_value = f"<strong>{escaped_value}</strong>"
-    return f'    <tr><th align="left">{label}</th><td>{escaped_value}</td></tr>'
+def _format_event_ids(event_ids: tuple[str, ...], language: str) -> str:
+    names = _EVENT_NAMES.get(language, _EVENT_NAMES["zh"])
+    separator = ", " if language == "en" else "、"
+    return separator.join(f"{names.get(event_id, event_id)} ({event_id})" for event_id in event_ids)
+
+
+def _escape_values(values: dict[str, str]) -> dict[str, str]:
+    return {key: html.escape(value, quote=True) for key, value in values.items()}
 
 
 def build_delivery_drafts(
@@ -34,7 +98,14 @@ def build_delivery_drafts(
     *,
     from_address: str,
     distance_available: bool,
+    template_catalog: EmailTemplateCatalog | None = None,
+    templates_path: Path | None = None,
 ) -> list[DeliveryDraft]:
+    """Render one localized delivery draft for every matching recipient."""
+
+    catalog = template_catalog or load_email_templates(
+        templates_path or DEFAULT_EMAIL_TEMPLATES_PATH
+    )
     drafts: list[DeliveryDraft] = []
     competition_event_ids = ordered_official_event_ids(details.event_ids)
     for recipient in recipients:
@@ -45,8 +116,20 @@ def build_delivery_drafts(
         )
         if not matched_event_ids:
             continue
-        matched_events_text = format_event_ids(matched_event_ids)
-        greeting = f"{recipient.name}，你好：" if recipient.name else "你好："
+
+        language = recipient.notification_language
+        language_fallbacks = _TEXT_FALLBACKS.get(language, _TEXT_FALLBACKS["zh"])
+        matched_events = _format_event_ids(matched_event_ids, language)
+        greeting = (
+            {
+                "zh": f"{recipient.name}，你好：",
+                "en": f"Hello {recipient.name},",
+                "ja": f"{recipient.name}さん、こんにちは。",
+            }.get(language, f"{recipient.name},")
+            if recipient.name
+            else {"zh": "你好：", "en": "Hello,", "ja": "こんにちは。"}.get(language, "Hello,")
+        )
+
         competition_coordinates_available = distance_available and coordinates_are_valid(
             details.latitude, details.longitude
         )
@@ -57,7 +140,7 @@ def build_delivery_drafts(
             assert details.latitude is not None and details.longitude is not None
             coordinate_text = f"{details.latitude:.6f}, {details.longitude:.6f}"
         else:
-            coordinate_text = "暂不可用"
+            coordinate_text = language_fallbacks["unavailable"]
         if competition_coordinates_available and recipient_coordinates_available:
             assert recipient.latitude is not None and recipient.longitude is not None
             distance = haversine_km(
@@ -70,61 +153,52 @@ def build_delivery_drafts(
         else:
             distance_text = "-"
 
-        subject = f"[WCA 比赛提醒] {details.name}"
-        lines = [
-            greeting,
-            "",
-            "WCA 新公示了一场包含你所关注项目的比赛。",
-            "",
-            f"比赛：{details.name}",
-            f"命中的关注项目：{matched_events_text}",
-            f"日期：{_date_range(details)}",
-            f"城市：{details.city or '未提供'} ({details.country_iso2 or '未知国家/地区'})",
-            f"场馆：{details.venue or '未提供'}",
-            f"地址：{details.venue_address or '未提供'}",
-            f"比赛坐标：{coordinate_text}",
-            f"与你配置位置的直线（大圆）距离：{distance_text}",
-            f"WCA 公示时间：{details.announced_at.isoformat()}",
-            f"比赛详情：{details.url}",
-        ]
-        if details.venue_details:
-            lines.extend(("", f"场地说明：{details.venue_details}"))
-        text_body = "\n".join(lines)
-
-        escaped_url = html.escape(details.url, quote=True)
-        city = f"{details.city or '未提供'} ({details.country_iso2 or '未知国家/地区'})"
-        rows = "\n".join(
-            (
-                _html_row("比赛", details.name),
-                _html_row("命中的关注项目", matched_events_text, strong=True),
-                _html_row("日期", _date_range(details)),
-                _html_row("城市", city),
-                _html_row("场馆", details.venue or "未提供"),
-                _html_row("地址", details.venue_address or "未提供"),
-                _html_row("比赛坐标", coordinate_text),
-                _html_row("直线（大圆）距离", distance_text, strong=True),
-                _html_row("WCA 公示时间", details.announced_at.isoformat()),
-            )
+        city_name = details.city or language_fallbacks["unknown"]
+        country_name = details.country_iso2 or language_fallbacks["unknown_country"]
+        city = f"{city_name} ({country_name})"
+        venue = details.venue or language_fallbacks["unknown"]
+        venue_address = details.venue_address or language_fallbacks["unknown"]
+        venue_label = {"zh": "场地说明", "en": "Venue details", "ja": "会場説明"}.get(
+            language, "Venue details"
+        )
+        venue_details_line = (
+            f"\n{venue_label}{':' if language == 'en' else '：'}"
+            f"{details.venue_details}"
+            if details.venue_details
+            else ""
         )
         venue_details_html = ""
         if details.venue_details:
             venue_details_html = (
-                f"<p><strong>场地说明：</strong>{html.escape(details.venue_details)}</p>"
+                f"<p><strong>{html.escape(venue_label)}"
+                f"{':' if language == 'en' else '：'}</strong>"
+                f"{html.escape(details.venue_details)}</p>"
             )
-        html_body = f"""\
-<!doctype html>
-<html lang="zh-CN">
-<body>
-  <p>{html.escape(greeting)}</p>
-  <p>WCA 新公示了一场包含你所关注项目的比赛。</p>
-  <table cellpadding="6" cellspacing="0" border="0">
-{rows}
-  </table>
-  <p><a href="{escaped_url}">查看 WCA 比赛详情</a></p>
-  {venue_details_html}
-</body>
-</html>
-"""
+
+        values = {
+            "greeting": greeting,
+            "competition_name": details.name,
+            "matched_events": matched_events,
+            "date_range": _date_range(details, language),
+            "city": city,
+            "venue": venue,
+            "venue_address": venue_address,
+            "competition_coordinates": coordinate_text,
+            "distance": distance_text,
+            "announced_at": details.announced_at.isoformat(),
+            "competition_url": details.url,
+            "venue_details_line": venue_details_line,
+            "venue_details_html": venue_details_html,
+        }
+        html_values = _escape_values(values)
+        # This value is already a deliberately constructed, escaped HTML fragment.
+        html_values["venue_details_html"] = venue_details_html
+        rendered = catalog.render_notification(
+            language,
+            subject_values=values,
+            text_values=values,
+            html_values=html_values,
+        )
         drafts.append(
             DeliveryDraft(
                 recipient_email=recipient.email,
@@ -132,9 +206,9 @@ def build_delivery_drafts(
                 recipient_latitude=recipient.latitude,
                 recipient_longitude=recipient.longitude,
                 message_id=_message_id(details.competition_id, recipient.email, from_address),
-                subject=subject,
-                text_body=text_body,
-                html_body=html_body,
+                subject=rendered.subject,
+                text_body=rendered.text_body,
+                html_body=rendered.html_body,
             )
         )
     return drafts

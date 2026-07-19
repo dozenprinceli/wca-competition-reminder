@@ -11,6 +11,7 @@ from pathlib import Path
 from wca_competition_reminder.config import RecipientConfig
 from wca_competition_reminder.events import OFFICIAL_EVENT_IDS
 from wca_competition_reminder.models import (
+    DEFAULT_NOTIFICATION_LANGUAGE,
     MAX_FOLLOW_CONDITIONS,
     CompetitionStatus,
     CompetitionSummary,
@@ -25,13 +26,13 @@ from wca_competition_reminder.models import (
 from wca_competition_reminder.utils import from_utc_text, retry_at, to_utc_text, utc_now
 from wca_competition_reminder.wca import summary_from_json
 
-SCHEMA_VERSION = 5
-MIGRATABLE_SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
+MIGRATABLE_SCHEMA_VERSION = 5
 ACTIVITY_LOG_RETENTION_DAYS = 7
 ACTIVITY_LOG_DETAILS_MAX_BYTES = 16 * 1024
 
 _STATE_TABLES = {"app_state", "subscribers", "competitions", "deliveries"}
-_V4_REQUIRED_COLUMNS = {
+_V5_REQUIRED_COLUMNS = {
     "app_state": {"key", "value"},
     "subscribers": {
         "email",
@@ -80,6 +81,17 @@ _V4_REQUIRED_COLUMNS = {
         "created_at",
         "sent_at",
     },
+}
+
+_SUBSCRIBER_CONDITION_COLUMNS = {
+    "subscriber_email",
+    "position",
+    "latitude",
+    "longitude",
+    "max_distance_km",
+    "event_ids_json",
+    "country_names_json",
+    "continent_names_json",
 }
 
 
@@ -225,50 +237,92 @@ class StateStore:
             missing_tables = _STATE_TABLES - existing_tables
             missing_columns = {
                 table: required - self._table_columns(table)
-                for table, required in _V4_REQUIRED_COLUMNS.items()
+                for table, required in _V5_REQUIRED_COLUMNS.items()
                 if table in existing_tables and required - self._table_columns(table)
             }
             if missing_tables or missing_columns:
                 raise StateError(
-                    "state database schema version 4 does not match the expected layout; "
-                    "cannot migrate it safely"
-                )
-            if "subscriber_conditions" in existing_tables:
-                raise StateError(
-                    "state database schema version 4 already contains subscriber_conditions; "
+                    "state database schema version 5 does not match the expected layout; "
                     "cannot migrate it safely"
                 )
 
+            subscriber_columns = self._table_columns("subscribers")
+            if "subscriber_conditions" in existing_tables:
+                condition_columns = self._table_columns("subscriber_conditions")
+                if _SUBSCRIBER_CONDITION_COLUMNS - condition_columns:
+                    raise StateError(
+                        "state database schema version 5 has an invalid subscriber_conditions "
+                        "table; cannot migrate it safely"
+                    )
+            else:
+                # A v5 database normally has this table. Keep a narrow compatibility path for
+                # legacy single-condition databases that already carry the new language column;
+                # a database missing both pieces is rejected as an unsupported older layout.
+                if "notification_language" not in subscriber_columns:
+                    raise StateError(
+                        "state database schema version 5 is missing subscriber_conditions; "
+                        "cannot migrate it safely"
+                    )
+                self._connection.execute(
+                    """
+                    CREATE TABLE subscriber_conditions (
+                        subscriber_email TEXT NOT NULL
+                            REFERENCES subscribers(email) ON DELETE CASCADE,
+                        position INTEGER NOT NULL
+                            CHECK (position >= 0 AND position < 10),
+                        latitude REAL CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+                        longitude REAL CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
+                        max_distance_km REAL
+                            CHECK (max_distance_km IS NULL OR max_distance_km > 0),
+                        event_ids_json TEXT,
+                        country_names_json TEXT,
+                        continent_names_json TEXT,
+                        PRIMARY KEY (subscriber_email, position),
+                        CHECK ((latitude IS NULL) = (longitude IS NULL)),
+                        CHECK (max_distance_km IS NULL OR latitude IS NOT NULL)
+                    )
+                    """
+                )
+                self._connection.execute(
+                    """
+                    INSERT INTO subscriber_conditions(
+                        subscriber_email, position, latitude, longitude, max_distance_km,
+                        event_ids_json, country_names_json, continent_names_json
+                    )
+                    SELECT email, 0, latitude, longitude, max_distance_km,
+                           event_ids_json, country_names_json, continent_names_json
+                    FROM subscribers
+                    """
+                )
+
+            if "notification_language" not in subscriber_columns:
+                self._connection.execute(
+                    """
+                    ALTER TABLE subscribers
+                    ADD COLUMN notification_language TEXT NOT NULL DEFAULT 'zh'
+                        CHECK (notification_language IN ('zh', 'en', 'ja'))
+                    """
+                )
+            # Older databases have no preference column. Treat null/blank values from
+            # partially migrated local copies as the documented Chinese default too.
             self._connection.execute(
                 """
-                CREATE TABLE subscriber_conditions (
-                    subscriber_email TEXT NOT NULL REFERENCES subscribers(email) ON DELETE CASCADE,
-                    position INTEGER NOT NULL
-                        CHECK (position >= 0 AND position < 10),
-                    latitude REAL CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
-                    longitude REAL CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
-                    max_distance_km REAL
-                        CHECK (max_distance_km IS NULL OR max_distance_km > 0),
-                    event_ids_json TEXT,
-                    country_names_json TEXT,
-                    continent_names_json TEXT,
-                    PRIMARY KEY (subscriber_email, position),
-                    CHECK ((latitude IS NULL) = (longitude IS NULL)),
-                    CHECK (max_distance_km IS NULL OR latitude IS NOT NULL)
-                )
+                UPDATE subscribers
+                SET notification_language = 'zh'
+                WHERE notification_language IS NULL OR TRIM(notification_language) = ''
                 """
             )
-            self._connection.execute(
+            invalid_language = self._connection.execute(
                 """
-                INSERT INTO subscriber_conditions(
-                    subscriber_email, position, latitude, longitude, max_distance_km,
-                    event_ids_json, country_names_json, continent_names_json
+                SELECT 1 FROM subscribers
+                WHERE notification_language NOT IN ('zh', 'en', 'ja')
+                LIMIT 1
+                """
+            ).fetchone()
+            if invalid_language is not None:
+                raise StateError(
+                    "state database schema version 5 contains an invalid notification language"
                 )
-                SELECT email, 0, latitude, longitude, max_distance_km,
-                       event_ids_json, country_names_json, continent_names_json
-                FROM subscribers
-                """
-            )
             self._connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
     def _create_schema(self) -> None:
@@ -298,6 +352,8 @@ class StateStore:
                 event_ids_json TEXT,
                 country_names_json TEXT,
                 continent_names_json TEXT,
+                notification_language TEXT NOT NULL DEFAULT 'zh'
+                    CHECK (notification_language IN ('zh', 'en', 'ja')),
                 active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -438,6 +494,9 @@ class StateStore:
             event_ids=first.event_ids,
             country_names=first.country_names,
             continent_names=first.continent_names,
+            notification_language=(
+                str(row["notification_language"]) or DEFAULT_NOTIFICATION_LANGUAGE
+            ),
             additional_conditions=tuple(additional),
             active=bool(row["active"]),
             created_at=created_at,
@@ -528,6 +587,7 @@ class StateStore:
                 _encode_filter(recipient.event_ids),
                 _encode_filter(recipient.country_names),
                 _encode_filter(recipient.continent_names),
+                recipient.notification_language,
                 timestamp,
             )
             if row is not None and bool(row["active"]):
@@ -538,8 +598,9 @@ class StateStore:
                     INSERT INTO subscribers(
                         email, name, latitude, longitude, max_distance_km,
                         event_ids_json, country_names_json, continent_names_json,
+                        notification_language,
                         active, created_at, updated_at, cancelled_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)
                     """,
                     (*values, timestamp),
                 )
@@ -549,7 +610,8 @@ class StateStore:
                     UPDATE subscribers
                     SET name = ?, latitude = ?, longitude = ?, max_distance_km = ?,
                         event_ids_json = ?, country_names_json = ?,
-                        continent_names_json = ?, active = 1, updated_at = ?,
+                        continent_names_json = ?, notification_language = ?,
+                        active = 1, updated_at = ?,
                         cancelled_at = NULL
                     WHERE email = ?
                     """,
@@ -561,6 +623,7 @@ class StateStore:
                         _encode_filter(recipient.event_ids),
                         _encode_filter(recipient.country_names),
                         _encode_filter(recipient.continent_names),
+                        recipient.notification_language,
                         timestamp,
                         recipient.email,
                     ),
@@ -577,8 +640,10 @@ class StateStore:
             cursor = self._connection.execute(
                 """
                 UPDATE subscribers
-                SET name = ?, latitude = ?, longitude = ?, max_distance_km = ?, event_ids_json = ?,
-                    country_names_json = ?, continent_names_json = ?, updated_at = ?
+                    SET name = ?, latitude = ?, longitude = ?, max_distance_km = ?,
+                        event_ids_json = ?,
+                        country_names_json = ?, continent_names_json = ?,
+                        notification_language = ?, updated_at = ?
                 WHERE email = ? AND active = 1
                 """,
                 (
@@ -589,6 +654,7 @@ class StateStore:
                     _encode_filter(recipient.event_ids),
                     _encode_filter(recipient.country_names),
                     _encode_filter(recipient.continent_names),
+                    recipient.notification_language,
                     to_utc_text(now),
                     recipient.email,
                 ),
@@ -1276,6 +1342,7 @@ class StateStore:
                     if record.continent_names is not None
                     else None
                 ),
+                "notification_language": record.notification_language,
                 "conditions": [_condition_dict(condition) for condition in record.conditions],
                 "active": record.active,
                 "created_at": record.created_at.isoformat(),

@@ -8,6 +8,36 @@ from wca_competition_reminder.distance import coordinates_are_valid, haversine_k
 MAX_FOLLOW_CONDITIONS = 10
 
 
+class NotificationLanguage(StrEnum):
+    """Languages available for competition notification emails."""
+
+    ZH = "zh"
+    EN = "en"
+    JA = "ja"
+
+
+SUPPORTED_NOTIFICATION_LANGUAGES = frozenset(language.value for language in NotificationLanguage)
+DEFAULT_NOTIFICATION_LANGUAGE = NotificationLanguage.ZH.value
+
+
+def normalize_notification_language(
+    value: object,
+    *,
+    default: str = DEFAULT_NOTIFICATION_LANGUAGE,
+) -> str:
+    """Return a supported language code from a UI/API locale value."""
+
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return default
+    if not isinstance(value, str):
+        raise ValueError("notification language must be a string")
+    normalized = value.strip().lower().replace("_", "-")
+    language = normalized.split("-", 1)[0]
+    if language not in SUPPORTED_NOTIFICATION_LANGUAGES:
+        raise ValueError("notification language must be one of: zh, en, ja")
+    return language
+
+
 class CompetitionStatus(StrEnum):
     BASELINE = "baseline"
     # Retained so state databases created by the Megaminx-only release remain readable.
@@ -109,6 +139,7 @@ class SubscriberRecord:
     updated_at: datetime
     cancelled_at: datetime | None
     additional_conditions: tuple[FollowCondition, ...] = ()
+    notification_language: str = DEFAULT_NOTIFICATION_LANGUAGE
 
     @property
     def conditions(self) -> tuple[FollowCondition, ...]:

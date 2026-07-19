@@ -21,6 +21,7 @@ from wca_competition_reminder.config import (
     load_smtp_password,
 )
 from wca_competition_reminder.distance import coordinates_are_valid
+from wca_competition_reminder.email_templates import EmailTemplateError, load_email_templates
 from wca_competition_reminder.events import OFFICIAL_EVENT_IDS, format_event_ids
 from wca_competition_reminder.locking import AlreadyRunningError, ProcessLock
 from wca_competition_reminder.mailer import DeliverySendError, SmtpMailer
@@ -362,6 +363,7 @@ def main(argv: list[str] | None = None) -> int:
             process_name=arguments.command,
         )
         if arguments.command == "check-config":
+            load_email_templates(config.email_templates_path)
             print(
                 "configuration_valid=true "
                 f"python={sys.version_info.major}.{sys.version_info.minor} "
@@ -390,7 +392,13 @@ def main(argv: list[str] | None = None) -> int:
     except AlreadyRunningError as exc:
         LOGGER.warning("%s", exc)
         return 0
-    except (ConfigurationError, DeliverySendError, StateError, WcaApiError) as exc:
+    except (
+        ConfigurationError,
+        DeliverySendError,
+        EmailTemplateError,
+        StateError,
+        WcaApiError,
+    ) as exc:
         LOGGER.error("%s", exc)
         return 1
     except Exception:

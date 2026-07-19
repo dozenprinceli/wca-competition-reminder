@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import inspect
 import json
 import logging
 import math
@@ -20,12 +21,16 @@ from ipaddress import IPv4Address, IPv6Address, ip_address
 from pathlib import Path
 from threading import Lock
 from time import monotonic
-from typing import Any, cast
+from typing import Any, Literal, cast
 from urllib.parse import parse_qs, urlsplit
 
 from wca_competition_reminder.config import AppConfig
 from wca_competition_reminder.events import OFFICIAL_EVENTS
 from wca_competition_reminder.mailer import DeliverySendError, SmtpMailer
+from wca_competition_reminder.models import (
+    DEFAULT_NOTIFICATION_LANGUAGE,
+    normalize_notification_language,
+)
 from wca_competition_reminder.state import StateStore
 from wca_competition_reminder.subscriptions import (
     SubscriptionConflictError,
@@ -66,10 +71,52 @@ STATIC_FILES = {
     "/admin.css": "admin.css",
 }
 
-VerificationSender = Callable[[str, str, datetime], None]
+VerificationSender = Callable[..., None]
 Clock = Callable[[], datetime]
 CodeFactory = Callable[[], str]
 IPAddress = IPv4Address | IPv6Address
+
+
+VerificationSenderLanguageMode = Literal[
+    "positional",
+    "keyword-language",
+    "keyword-notification-language",
+    "keyword-kwargs",
+    "legacy",
+]
+
+
+def _verification_sender_language_mode(
+    sender: VerificationSender,
+) -> VerificationSenderLanguageMode:
+    try:
+        signature = inspect.signature(sender)
+    except (TypeError, ValueError):
+        return "legacy"
+    parameters = tuple(signature.parameters.values())
+    if any(parameter.kind == inspect.Parameter.VAR_POSITIONAL for parameter in parameters):
+        return "positional"
+    positional_count = sum(
+        parameter.kind
+        in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        for parameter in parameters
+    )
+    if positional_count >= 4:
+        return "positional"
+    if any(
+        parameter.kind == inspect.Parameter.KEYWORD_ONLY and parameter.name == "language"
+        for parameter in parameters
+    ):
+        return "keyword-language"
+    if any(
+        parameter.kind == inspect.Parameter.KEYWORD_ONLY
+        and parameter.name == "notification_language"
+        for parameter in parameters
+    ):
+        return "keyword-notification-language"
+    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters):
+        return "keyword-kwargs"
+    return "legacy"
 
 
 def _parse_ip_address(value: str | None) -> IPAddress | None:
@@ -154,6 +201,9 @@ class ReminderHttpServer(ThreadingHTTPServer):
         self._verification_lock = Lock()
         self._verification_challenges: dict[str, VerificationChallenge] = {}
         self._verification_sender = verification_sender
+        self._verification_sender_language_mode = _verification_sender_language_mode(
+            verification_sender
+        )
         self._clock = clock
         self._code_factory = code_factory or (lambda: f"{secrets.randbelow(1_000_000):06d}")
         self._admin_lock = Lock()
@@ -165,7 +215,15 @@ class ReminderHttpServer(ThreadingHTTPServer):
     def _verification_hash(email: str, code: str) -> bytes:
         return hashlib.sha256(f"{email}\0{code}".encode()).digest()
 
-    def issue_verification_code(self, email: str) -> None:
+    def issue_verification_code(
+        self,
+        email: str,
+        notification_language: object = DEFAULT_NOTIFICATION_LANGUAGE,
+    ) -> None:
+        try:
+            language = normalize_notification_language(notification_language)
+        except ValueError as exc:
+            raise SubscriptionValidationError("邮件通知语言仅支持 zh、en 或 ja") from exc
         now = self._clock()
         with self._verification_lock:
             current = self._verification_challenges.get(email)
@@ -185,7 +243,17 @@ class ReminderHttpServer(ThreadingHTTPServer):
             )
             self._verification_challenges[email] = challenge
         try:
-            self._verification_sender(email, code, now)
+            if self._verification_sender_language_mode == "positional":
+                self._verification_sender(email, code, now, language)
+            elif self._verification_sender_language_mode == "keyword-language":
+                self._verification_sender(email, code, now, language=language)
+            elif self._verification_sender_language_mode in {
+                "keyword-notification-language",
+                "keyword-kwargs",
+            }:
+                self._verification_sender(email, code, now, notification_language=language)
+            else:
+                self._verification_sender(email, code, now)
         except BaseException:
             with self._verification_lock:
                 if self._verification_challenges.get(email) is challenge:
@@ -560,7 +628,8 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                 record = state.find_subscriber(email)
                 if record is not None and record.active:
                     raise SubscriptionConflictError("该邮箱已经订阅，请直接修改订阅")
-            cast(ReminderHttpServer, self.server).issue_verification_code(email)
+            language = payload.get("notification_language", DEFAULT_NOTIFICATION_LANGUAGE)
+            cast(ReminderHttpServer, self.server).issue_verification_code(email, language)
         except SubscriptionValidationError as exc:
             self._audit(
                 "verification_code_request",
@@ -930,6 +999,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                         if recipient.continent_names is not None
                         else None
                     ),
+                    "notification_language": recipient.notification_language,
                     "conditions": [
                         {
                             "latitude": condition.latitude,
@@ -990,6 +1060,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             "continents": (
                 list(subscription.continents) if subscription.continents is not None else None
             ),
+            "notification_language": subscription.notification_language,
             "conditions": subscription.to_dict()["conditions"],
             "active": subscription.active,
             "updated_at": subscription.updated_at.isoformat(),
@@ -1262,9 +1333,23 @@ def create_server(
     sender = verification_sender
     if sender is None:
 
-        def smtp_sender(email: str, code: str, created_at: datetime) -> None:
-            with SmtpMailer(config.smtp, smtp_password) as mailer:
-                mailer.send_verification_code(email, code, created_at)
+        def smtp_sender(
+            email: str,
+            code: str,
+            created_at: datetime,
+            notification_language: str = DEFAULT_NOTIFICATION_LANGUAGE,
+        ) -> None:
+            with SmtpMailer(
+                config.smtp,
+                smtp_password,
+                templates_path=config.email_templates_path,
+            ) as mailer:
+                mailer.send_verification_code(
+                    email,
+                    code,
+                    created_at,
+                    notification_language,
+                )
 
         sender = smtp_sender
 

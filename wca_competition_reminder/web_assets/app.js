@@ -84,6 +84,11 @@ const TRANSLATIONS = {
     emailLabel: "邮箱地址",
     nameLabel: "称呼",
     namePlaceholder: "例如：Alex",
+    notificationLanguageLabel: "我希望以什么语言被发送邮件通知",
+    notificationLanguageHint: "默认使用当前界面语言",
+    notificationLanguageZh: "中文",
+    notificationLanguageEn: "English",
+    notificationLanguageJa: "日本語",
     latitudeLabel: "纬度",
     latitudeHint: "可选，需与经度同时填写",
     longitudeLabel: "经度",
@@ -230,6 +235,11 @@ const TRANSLATIONS = {
     emailLabel: "Email address",
     nameLabel: "Name",
     namePlaceholder: "e.g. Alex",
+    notificationLanguageLabel: "I want email notifications in",
+    notificationLanguageHint: "Defaults to the current interface language",
+    notificationLanguageZh: "中文",
+    notificationLanguageEn: "English",
+    notificationLanguageJa: "日本語",
     latitudeLabel: "Latitude",
     latitudeHint: "Optional; enter together with longitude",
     longitudeLabel: "Longitude",
@@ -376,6 +386,11 @@ const TRANSLATIONS = {
     emailLabel: "メールアドレス",
     nameLabel: "お名前",
     namePlaceholder: "例：Alex",
+    notificationLanguageLabel: "メール通知の言語",
+    notificationLanguageHint: "現在の画面言語が初期値です",
+    notificationLanguageZh: "中文",
+    notificationLanguageEn: "English",
+    notificationLanguageJa: "日本語",
     latitudeLabel: "緯度",
     latitudeHint: "任意。経度と一緒に入力してください",
     longitudeLabel: "経度",
@@ -671,11 +686,13 @@ const state = {
   verificationDeadline: 0,
   verificationEmail: null,
   loadedSubscription: null,
+  notificationLanguageTouched: false,
 };
 
 const form = document.querySelector("#subscription-form");
 const emailInput = document.querySelector("#email");
 const nameInput = document.querySelector("#name");
+const notificationLanguageInput = document.querySelector("#notification-language");
 const locationDialog = document.querySelector("#location-dialog");
 const locationDialogClose = document.querySelector("#location-dialog-close");
 const locationDialogCancel = document.querySelector("#location-dialog-cancel");
@@ -736,6 +753,12 @@ function t(key, variables = {}) {
   return String(template).replace(/\{\{(\w+)\}\}/g, (_match, name) => {
     return variables[name] === undefined ? `{{${name}}}` : String(variables[name]);
   });
+}
+
+function setNotificationLanguageDefault() {
+  if (!state.notificationLanguageTouched && !state.subscriptionLoaded) {
+    notificationLanguageInput.value = state.language;
+  }
 }
 
 function persistLanguage(language) {
@@ -882,6 +905,7 @@ function applyLanguage(language, { persist = true } = {}) {
       googleMapsRequestedLocale.region !== nextMapsLocale.region);
 
   state.language = nextLanguage;
+  setNotificationLanguageDefault();
   if (persist) {
     persistLanguage(state.language);
     replaceLanguageQuery(state.language);
@@ -916,6 +940,7 @@ function applyLanguage(language, { persist = true } = {}) {
   applyModeCopy();
   renderOptions();
   updateClock();
+  setNotificationLanguageDefault();
 }
 
 function showToast(message, isError = false, messageFactory = null) {
@@ -1488,7 +1513,13 @@ function localizedErrorMessage(error, fallbackKey = "operationFailure") {
 }
 
 function clearInvalidState() {
-  [emailInput, nameInput, verificationCodeInput, notificationConsentInput].forEach((input) => {
+  [
+    emailInput,
+    nameInput,
+    notificationLanguageInput,
+    verificationCodeInput,
+    notificationConsentInput,
+  ].forEach((input) => {
     input.removeAttribute("aria-invalid");
   });
   conditionList.querySelectorAll('[aria-invalid="true"]').forEach((input) => {
@@ -1515,6 +1546,8 @@ function resetModifyLookup() {
   emailInput.readOnly = false;
   setProfileVisible(false);
   loadedBanner.classList.add("is-hidden");
+  state.notificationLanguageTouched = false;
+  setNotificationLanguageDefault();
   applyModeCopy();
 }
 
@@ -1523,6 +1556,7 @@ function setMode(mode) {
   state.subscriptionLoaded = false;
   state.loadedSubscription = null;
   state.loadingSubscription = false;
+  state.notificationLanguageTouched = false;
   emailInput.readOnly = false;
   loadedBanner.classList.add("is-hidden");
   clearInvalidState();
@@ -1545,6 +1579,7 @@ function setMode(mode) {
   if (mode !== "register" && !emailInput.value) {
     emailInput.value = window.localStorage.getItem(STORAGE_KEY) || "";
   }
+  setNotificationLanguageDefault();
 }
 
 function makeChoice({ name, value, label, code = "" }) {
@@ -1908,6 +1943,7 @@ function collectPayload() {
     return payload;
   }
   payload.name = nameInput.value.trim();
+  payload.notification_language = notificationLanguageInput.value || state.language;
   payload.conditions = conditionCards().map(collectCondition);
   if (state.mode === "register") {
     payload.verification_code = verificationCodeInput.value.trim();
@@ -2032,6 +2068,8 @@ async function requestSubscription(method, payload) {
 function populateSubscription(subscription) {
   emailInput.value = subscription.email || "";
   nameInput.value = subscription.name || "";
+  notificationLanguageInput.value = normalizeLanguage(subscription.notification_language) || state.language;
+  state.notificationLanguageTouched = true;
   const legacyCondition = {
     latitude: subscription.latitude,
     longitude: subscription.longitude,
@@ -2117,12 +2155,13 @@ function startVerificationCooldown(seconds = 60) {
 async function sendVerificationCode() {
   if (!validateEmail()) return;
   const email = emailInput.value.trim().toLowerCase();
+  const notificationLanguage = notificationLanguageInput.value || state.language;
   startVerificationCooldown(60);
   try {
     await requestJson("/api/verification-codes", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, notification_language: notificationLanguage }),
     });
     state.verificationEmail = email;
     verificationCodeInput.focus();
@@ -2190,6 +2229,8 @@ function resetForm() {
   }
   form.reset();
   resetSelections();
+  state.notificationLanguageTouched = false;
+  setNotificationLanguageDefault();
   clearInvalidState();
   state.verificationEmail = null;
   if (state.mode === "modify") resetModifyLookup();
@@ -2227,6 +2268,9 @@ function updateClock() {
 function bindEvents() {
   languageButtons.forEach((button) => {
     button.addEventListener("click", () => applyLanguage(button.dataset.language));
+  });
+  notificationLanguageInput.addEventListener("change", () => {
+    state.notificationLanguageTouched = true;
   });
   document.querySelectorAll(".mode-button").forEach((button) => {
     button.addEventListener("click", () => setMode(button.dataset.mode));

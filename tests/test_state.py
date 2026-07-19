@@ -123,6 +123,35 @@ def test_v4_schema_is_fully_migrated_to_one_condition_without_losing_state(
     assert condition_count == 1
 
 
+def test_v5_schema_without_notification_language_defaults_existing_rows_to_chinese(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "state.sqlite3"
+    with StateStore(path) as state:
+        state.register_subscriber(
+            RecipientConfig("legacy-language@example.com", None, None, "Legacy"),
+            NOW,
+        )
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("ALTER TABLE subscribers DROP COLUMN notification_language")
+        connection.execute(f"PRAGMA user_version = {MIGRATABLE_SCHEMA_VERSION}")
+
+    with StateStore(path) as state:
+        subscriber = state.find_subscriber("legacy-language@example.com")
+        assert subscriber is not None
+        assert subscriber.notification_language == "zh"
+
+    with sqlite3.connect(path) as connection:
+        version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+        language = connection.execute(
+            "SELECT notification_language FROM subscribers WHERE email = ?",
+            ("legacy-language@example.com",),
+        ).fetchone()[0]
+    assert version == SCHEMA_VERSION
+    assert language == "zh"
+
+
 def test_concurrent_v4_open_only_migrates_once(tmp_path: Path) -> None:
     path = tmp_path / "state.sqlite3"
     with StateStore(path):

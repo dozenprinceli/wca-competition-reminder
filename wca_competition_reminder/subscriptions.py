@@ -9,9 +9,11 @@ from typing import Any
 from wca_competition_reminder.config import RecipientConfig
 from wca_competition_reminder.events import OFFICIAL_EVENT_IDS
 from wca_competition_reminder.models import (
+    DEFAULT_NOTIFICATION_LANGUAGE,
     MAX_FOLLOW_CONDITIONS,
     FollowCondition,
     SubscriberRecord,
+    normalize_notification_language,
 )
 from wca_competition_reminder.state import StateStore
 from wca_competition_reminder.utils import utc_now
@@ -48,6 +50,7 @@ class SubscriptionView:
     created_at: datetime
     updated_at: datetime
     cancelled_at: datetime | None
+    notification_language: str = DEFAULT_NOTIFICATION_LANGUAGE
 
     @classmethod
     def from_record(cls, record: SubscriberRecord) -> SubscriptionView:
@@ -66,6 +69,7 @@ class SubscriptionView:
                 if record.continent_names is not None
                 else None
             ),
+            notification_language=record.notification_language,
             conditions=record.conditions,
             active=record.active,
             created_at=record.created_at,
@@ -84,6 +88,7 @@ class SubscriptionView:
             "events": list(self.events) if self.events is not None else None,
             "countries": list(self.countries) if self.countries is not None else None,
             "continents": list(self.continents) if self.continents is not None else None,
+            "notification_language": self.notification_language,
             "conditions": conditions,
             "active": self.active,
             "created_at": self.created_at.isoformat(),
@@ -97,6 +102,7 @@ def recipient_from_record(record: SubscriberRecord) -> RecipientConfig:
         email=record.email,
         name=record.name,
         conditions=record.conditions,
+        notification_language=record.notification_language,
     )
 
 
@@ -252,7 +258,19 @@ def _conditions(payload: dict[str, object]) -> tuple[FollowCondition, ...]:
     return tuple(conditions)
 
 
-def _recipient(payload: object, *, email: str | None = None) -> RecipientConfig:
+def _notification_language(value: object, *, default: str) -> str:
+    try:
+        return normalize_notification_language(value, default=default)
+    except ValueError as exc:
+        raise SubscriptionValidationError("邮件通知语言仅支持 zh、en 或 ja") from exc
+
+
+def _recipient(
+    payload: object,
+    *,
+    email: str | None = None,
+    default_notification_language: str = DEFAULT_NOTIFICATION_LANGUAGE,
+) -> RecipientConfig:
     if not isinstance(payload, dict):
         raise SubscriptionValidationError("请求内容必须是 JSON 对象")
     supplied_email = payload.get("email")
@@ -267,6 +285,10 @@ def _recipient(payload: object, *, email: str | None = None) -> RecipientConfig:
         email=normalized_email,
         name=_name(payload.get("name")),
         conditions=_conditions(payload),
+        notification_language=_notification_language(
+            payload.get("notification_language"),
+            default=default_notification_language,
+        ),
     )
 
 
@@ -292,7 +314,17 @@ class SubscriptionService:
         if not isinstance(payload, dict):
             raise SubscriptionValidationError("请求内容必须是 JSON 对象")
         email = normalize_email(payload.get("email"))
-        recipient = _recipient(payload, email=email)
+        existing = self._state.find_subscriber(email)
+        default_language = (
+            existing.notification_language
+            if existing is not None and existing.active
+            else DEFAULT_NOTIFICATION_LANGUAGE
+        )
+        recipient = _recipient(
+            payload,
+            email=email,
+            default_notification_language=default_language,
+        )
         if not self._state.update_subscriber(recipient, self._clock()):
             raise SubscriptionNotFoundError("该邮箱尚未注册")
         record = self._state.find_subscriber(email)

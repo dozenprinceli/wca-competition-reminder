@@ -10,8 +10,14 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from wca_competition_reminder.email_templates import DEFAULT_EMAIL_TEMPLATES_PATH
 from wca_competition_reminder.events import OFFICIAL_EVENT_IDS
-from wca_competition_reminder.models import MAX_FOLLOW_CONDITIONS, FollowCondition
+from wca_competition_reminder.models import (
+    DEFAULT_NOTIFICATION_LANGUAGE,
+    MAX_FOLLOW_CONDITIONS,
+    FollowCondition,
+    normalize_notification_language,
+)
 
 
 class ConfigurationError(ValueError):
@@ -29,10 +35,16 @@ class RecipientConfig:
     continent_names: frozenset[str] | None = None
     max_distance_km: float | None = None
     additional_conditions: tuple[FollowCondition, ...] = ()
+    notification_language: str = DEFAULT_NOTIFICATION_LANGUAGE
 
     def __post_init__(self) -> None:
         if len(self.additional_conditions) >= MAX_FOLLOW_CONDITIONS:
             raise ValueError(f"a recipient can have at most {MAX_FOLLOW_CONDITIONS} conditions")
+        try:
+            language = normalize_notification_language(self.notification_language)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        object.__setattr__(self, "notification_language", language)
 
     @property
     def conditions(self) -> tuple[FollowCondition, ...]:
@@ -55,6 +67,7 @@ class RecipientConfig:
         email: str,
         name: str | None,
         conditions: tuple[FollowCondition, ...],
+        notification_language: str = DEFAULT_NOTIFICATION_LANGUAGE,
     ) -> RecipientConfig:
         if not conditions:
             raise ValueError("a recipient must have at least one condition")
@@ -71,6 +84,7 @@ class RecipientConfig:
             continent_names=first.continent_names,
             max_distance_km=first.max_distance_km,
             additional_conditions=tuple(additional),
+            notification_language=notification_language,
         )
 
     def follows_any(self, event_ids: Iterable[str]) -> bool:
@@ -147,6 +161,7 @@ class RecipientConfig:
             email=self.email,
             name=self.name,
             conditions=(condition,),
+            notification_language=self.notification_language,
         )
 
 
@@ -197,6 +212,7 @@ class AppConfig:
     amap_api_key: str | None = None
     amap_security_js_code: str | None = None
     amap_service_host: str | None = None
+    email_templates_path: Path = DEFAULT_EMAIL_TEMPLATES_PATH
 
 
 def _table(document: dict[str, object], name: str) -> dict[str, object]:
@@ -271,6 +287,13 @@ def _email(value: object, field_name: str) -> str:
     if not address.domain or not address.username or address.addr_spec != normalized:
         raise ConfigurationError(f"{field_name} is not a valid email address")
     return normalized
+
+
+def _notification_language(value: object, field_name: str) -> str:
+    try:
+        return normalize_notification_language(value)
+    except ValueError as exc:
+        raise ConfigurationError(f"{field_name} must be one of: zh, en, ja") from exc
 
 
 def _path(value: object, field_name: str, base_directory: Path) -> Path:
@@ -430,6 +453,11 @@ def load_config(path: Path) -> AppConfig:
     state_path = _path(document.get("state_path", "state.sqlite3"), "state_path", base_directory)
     lock_path = _path(document.get("lock_path", "runner.lock"), "lock_path", base_directory)
     log_dir = _path(document.get("log_dir", "logs"), "log_dir", base_directory)
+    email_templates_path = _path(
+        document.get("email_templates_path", "config/email_templates.toml"),
+        "email_templates_path",
+        base_directory,
+    )
     coordinate_retry_hours = _integer(
         document, "coordinate_retry_hours", 24, minimum=1, maximum=168
     )
@@ -548,6 +576,10 @@ def load_config(path: Path) -> AppConfig:
                 email=email,
                 name=name or None,
                 conditions=_recipient_conditions(recipient_document, f"recipients[{index}]"),
+                notification_language=_notification_language(
+                    recipient_document.get("notification_language"),
+                    f"recipients[{index}].notification_language",
+                ),
             )
         )
 
@@ -568,6 +600,7 @@ def load_config(path: Path) -> AppConfig:
         amap_api_key=amap_api_key,
         amap_security_js_code=amap_security_js_code,
         amap_service_host=amap_service_host,
+        email_templates_path=email_templates_path,
     )
 
 

@@ -7,6 +7,7 @@ from tests.conftest import make_config, make_details
 from wca_competition_reminder.config import RecipientConfig
 from wca_competition_reminder.distance import haversine_km
 from wca_competition_reminder.email_content import build_delivery_drafts
+from wca_competition_reminder.email_templates import DEFAULT_EMAIL_TEMPLATES_PATH
 
 
 def test_haversine_same_point_is_zero() -> None:
@@ -89,3 +90,51 @@ def test_email_uses_dash_when_recipient_coordinates_are_empty(tmp_path) -> None:
 
     assert "比赛坐标：31.230400, 121.473700" in draft.text_body
     assert "直线（大圆）距离：-" in draft.text_body
+
+
+def test_email_templates_render_english_and_japanese_notifications(tmp_path) -> None:
+    config = make_config(tmp_path)
+    recipients = (
+        replace(config.recipients[0], notification_language="en"),
+        replace(config.recipients[1], notification_language="ja"),
+    )
+
+    drafts = build_delivery_drafts(
+        make_details("Localized2026"),
+        recipients,
+        from_address=config.smtp.from_address,
+        distance_available=True,
+    )
+
+    assert drafts[0].subject.startswith("[WCA competition alert]")
+    assert "Matched events:" in drafts[0].text_body
+    assert '<html lang="en">' in drafts[0].html_body
+    assert drafts[1].subject.startswith("[WCA 大会告知]")
+    assert "一致した種目：" in drafts[1].text_body
+    assert '<html lang="ja">' in drafts[1].html_body
+
+
+def test_email_templates_are_reloaded_from_the_config_path_on_each_call(tmp_path) -> None:
+    config = make_config(tmp_path)
+    recipient = replace(config.recipients[0], notification_language="en")
+    template_path = tmp_path / "email_templates.toml"
+    source = DEFAULT_EMAIL_TEMPLATES_PATH.read_text(encoding="utf-8")
+
+    def rendered_subject(prefix: str) -> str:
+        template_path.write_text(
+            source.replace(
+                "[WCA competition alert] {competition_name}",
+                f"{prefix} {{competition_name}}",
+            ),
+            encoding="utf-8",
+        )
+        return build_delivery_drafts(
+            make_details("Reloaded2026"),
+            (recipient,),
+            from_address=config.smtp.from_address,
+            distance_available=True,
+            templates_path=template_path,
+        )[0].subject
+
+    assert rendered_subject("FIRST") == "FIRST Competition Reloaded2026"
+    assert rendered_subject("SECOND") == "SECOND Competition Reloaded2026"

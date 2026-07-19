@@ -79,6 +79,45 @@ def test_subscription_register_query_update_and_cancel(tmp_path: Path) -> None:
             service.update(subscription_payload())
 
 
+def test_subscription_notification_language_is_saved_and_preserved_on_omission(
+    tmp_path: Path,
+) -> None:
+    with StateStore(tmp_path / "state.sqlite3") as state:
+        service = SubscriptionService(state, clock=lambda: NOW)
+        view = service.register({**subscription_payload(), "notification_language": "ja-JP"})
+        assert view.notification_language == "ja"
+        assert view.to_dict()["notification_language"] == "ja"
+
+        updated = service.update(
+            {
+                "email": view.email,
+                "name": "Updated language",
+                "conditions": [{}],
+            }
+        )
+        assert updated.notification_language == "ja"
+
+        changed = service.update(
+            {
+                "email": view.email,
+                "name": "English language",
+                "notification_language": "en",
+                "conditions": [{}],
+            }
+        )
+        assert changed.notification_language == "en"
+
+
+def test_invalid_subscription_notification_language_is_rejected(tmp_path: Path) -> None:
+    with (
+        StateStore(tmp_path / "state.sqlite3") as state,
+        pytest.raises(SubscriptionValidationError, match="邮件通知语言"),
+    ):
+        SubscriptionService(state, clock=lambda: NOW).register(
+            {**subscription_payload(), "notification_language": "fr"}
+        )
+
+
 def test_subscription_persists_up_to_ten_ordered_conditions(tmp_path: Path) -> None:
     conditions = [
         {
@@ -318,6 +357,40 @@ def _start_test_server(tmp_path: Path, clock: MutableClock):
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, thread, sent_codes
+
+
+def test_verification_sender_receives_selected_notification_language(tmp_path: Path) -> None:
+    clock = MutableClock()
+    sent_languages: list[str] = []
+
+    def sender(_email: str, _code: str, _created_at: datetime, language: str) -> None:
+        sent_languages.append(language)
+
+    config = make_config(tmp_path)
+    server = web.create_server(
+        config,
+        port=0,
+        verification_sender=sender,
+        verification_code_factory=lambda: "123456",
+        clock=clock,
+    )
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        response, _ = _request_json(
+            connection,
+            "POST",
+            "/api/verification-codes",
+            {"email": "language@example.com", "notification_language": "ja"},
+        )
+        assert response.status == 200
+        assert sent_languages == ["ja"]
+    finally:
+        connection.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def test_http_verification_and_subscription_endpoints(tmp_path: Path, caplog) -> None:

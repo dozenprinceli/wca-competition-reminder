@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from wca_competition_reminder.config import AppConfig, RecipientConfig
 from wca_competition_reminder.distance import coordinates_are_valid
 from wca_competition_reminder.email_content import build_delivery_drafts
+from wca_competition_reminder.email_templates import EmailTemplateCatalog
 from wca_competition_reminder.events import ordered_official_event_ids
 from wca_competition_reminder.mailer import DeliverySendError, SmtpMailer
 from wca_competition_reminder.models import CompetitionStatus
@@ -26,6 +27,7 @@ class ReminderService:
         *,
         clock: Callable[[], datetime] = utc_now,
         stop_requested: Callable[[], bool] = lambda: False,
+        template_catalog: EmailTemplateCatalog | None = None,
     ) -> None:
         self._config = config
         self._state = state
@@ -33,6 +35,7 @@ class ReminderService:
         self._mailer = mailer
         self._clock = clock
         self._stop_requested = stop_requested
+        self._template_catalog = template_catalog
 
     def run_once(self) -> bool:
         started_at = self._clock()
@@ -266,6 +269,8 @@ class ReminderService:
                 matched_recipients,
                 from_address=self._config.smtp.from_address,
                 distance_available=coordinates_valid,
+                template_catalog=self._template_catalog,
+                templates_path=self._config.email_templates_path,
             )
             queued = self._state.queue_deliveries(
                 competition_id,

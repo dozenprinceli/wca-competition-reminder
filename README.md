@@ -27,6 +27,8 @@ it also includes the straight-line distance; otherwise the distance is shown as 
 - Establishes a silent baseline on first run, so existing competitions do not generate a
   flood of notifications.
 - Runs as a one-shot poller or a supervised, once-per-minute service with PM2.
+- Sends notification and verification emails in Chinese, English, or Japanese using editable
+  local templates in `config/email_templates.toml`.
 - Includes a browser subscription desk for registering, editing, and cancelling email alerts.
 - Includes a read-only operations console protected by a list of administrator accounts.
 - Stores queryable user/admin audit events with a rolling seven-day retention window.
@@ -80,6 +82,7 @@ password = "replace-with-a-strong-admin-password"
 [[recipients]]
 name = "Example recipient"
 email = "recipient@example.com"
+notification_language = "zh" # zh, en, or ja; omitted means Chinese
 
 [[recipients.conditions]]
 latitude = 31.2304
@@ -100,6 +103,12 @@ nested conditions. Coordinates are optional per condition: set both values or om
 positive `max_distance_km` value to receive only competitions within that great-circle
 distance. Coordinates are required when the distance filter is set. Without coordinates,
 email distance is shown as `-`.
+
+`email_templates_path` points to the local TOML email template file and defaults to
+`config/email_templates.toml` relative to `config.toml`. It contains Chinese, English, and
+Japanese subject, plain-text, and HTML templates for notifications and verification codes.
+TOML-managed recipients can set `notification_language` to `zh`, `en`, or `ja`; omitted values
+use Chinese.
 
 ### 3. Provide the SMTP password
 
@@ -143,7 +152,9 @@ Start the browser service alongside the poller:
 
 Open `http://127.0.0.1:8080/`. The form supports registering, modifying, and cancelling a
 subscription. Registration requires explicit consent to receive WCA competition notification
-emails and a six-digit email code that expires after five minutes. Code delivery is limited to
+emails and a six-digit email code that expires after five minutes. It also lets the subscriber
+choose the notification email language; the default follows the current interface language and
+the choice is retained when the subscription is modified. Code delivery is limited to
 once per email every 50 seconds, while the browser uses a 60-second countdown. Email is the
 only subscription identifier: current settings, updates, and cancellation do not use a token.
 Recipient coordinates are optional and must either both be set or both be empty. An optional
@@ -197,10 +208,10 @@ that expires after eight hours and is invalidated by a Web service restart. Publ
 must use HTTPS, and `config.toml` should be readable only by the service account. Administrator
 usernames must be unique; add more `[[admins]]` tables when multiple operators need access.
 
-Schema v5 automatically and transactionally migrates the current production v4 SQLite state
-database on startup. Every old subscription's location, radius, event, country/region, and
-continent fields are copied in full to position 0 (condition 1), preserving matching behavior.
-Schema v3 and earlier are no longer upgraded automatically.
+Schema v6 automatically and transactionally migrates the current production v5 SQLite state
+database on startup. Existing subscriptions without a language choice are assigned Chinese
+notifications; their location, radius, event, country/region, and continent fields are kept
+unchanged. Schema v4 and earlier are no longer upgraded automatically.
 
 ## Recipient Filters
 

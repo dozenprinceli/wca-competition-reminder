@@ -101,6 +101,15 @@
                   <span class="field-label"><span data-i18n="nameLabel">称呼</span> <b>*</b></span>
                   <input id="name" name="name" type="text" autocomplete="name" maxlength="120" placeholder="例如：Alex" data-i18n-placeholder="namePlaceholder" />
                 </label>
+                <label class="field field-wide">
+                  <span class="field-label" data-i18n="notificationLanguageLabel">我希望以什么语言被发送邮件通知</span>
+                  <select id="notification-language" name="notification_language">
+                    <option value="zh" data-i18n="notificationLanguageZh">中文</option>
+                    <option value="en" data-i18n="notificationLanguageEn">English</option>
+                    <option value="ja" data-i18n="notificationLanguageJa">日本語</option>
+                  </select>
+                  <span class="field-hint" data-i18n="notificationLanguageHint">默认使用当前界面语言</span>
+                </label>
               </div>
             </div>
 

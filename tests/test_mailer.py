@@ -139,3 +139,19 @@ def test_verification_code_uses_existing_smtp_transport(
     assert message["Subject"] == "[WCA 比赛提醒] 注册验证码"
     assert "123456" in message.get_body(preferencelist=("plain",)).get_content()
     assert "5 分钟" in message.get_body(preferencelist=("plain",)).get_content()
+
+
+def test_verification_code_uses_selected_notification_language(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = make_config(tmp_path)
+    FakeSmtp.reset()
+    monkeypatch.setattr(smtplib, "SMTP", FakeSmtp)
+
+    with SmtpMailer(config.smtp, "secret") as mailer:
+        mailer.send_verification_code("new@example.com", "123456", NOW, "en")
+
+    message = FakeSmtp.instances[0].sent[0][0]
+    assert message["Subject"] == "[WCA competition alert] Verification code"
+    assert "Verification code: 123456" in message.get_body(preferencelist=("plain",)).get_content()

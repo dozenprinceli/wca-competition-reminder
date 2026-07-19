@@ -1,0 +1,146 @@
+# Email templates are intentionally kept outside the Python package so copy and
+# wording changes can be reviewed without changing notification logic.
+
+[notification.zh]
+subject = "[WCA 比赛提醒] {competition_name}"
+text_body = """{greeting}
+
+WCA 新公示了一场包含你所关注项目的比赛。
+
+比赛：{competition_name}
+命中的关注项目：{matched_events}
+日期：{date_range}
+城市：{city}
+场馆：{venue}
+地址：{venue_address}
+比赛坐标：{competition_coordinates}
+与你配置位置的直线（大圆）距离：{distance}
+WCA 公示时间：{announced_at}
+比赛详情：{competition_url}{venue_details_line}
+"""
+html_body = """<!doctype html>
+<html lang="zh-CN">
+<body>
+  <p>{greeting}</p>
+  <p>WCA 新公示了一场包含你所关注项目的比赛。</p>
+  <table cellpadding="6" cellspacing="0" border="0">
+    <tr><th align="left">比赛</th><td>{competition_name}</td></tr>
+    <tr><th align="left">命中的关注项目</th><td><strong>{matched_events}</strong></td></tr>
+    <tr><th align="left">日期</th><td>{date_range}</td></tr>
+    <tr><th align="left">城市</th><td>{city}</td></tr>
+    <tr><th align="left">场馆</th><td>{venue}</td></tr>
+    <tr><th align="left">地址</th><td>{venue_address}</td></tr>
+    <tr><th align="left">比赛坐标</th><td>{competition_coordinates}</td></tr>
+    <tr><th align="left">与你配置位置的直线（大圆）距离</th><td><strong>{distance}</strong></td></tr>
+    <tr><th align="left">WCA 公示时间</th><td>{announced_at}</td></tr>
+  </table>
+  <p><a href="{competition_url}">查看 WCA 比赛详情</a></p>
+  {venue_details_html}
+</body>
+</html>"""
+
+[notification.en]
+subject = "[WCA competition alert] {competition_name}"
+text_body = """{greeting}
+
+WCA has announced a competition that includes one of your followed events.
+
+Competition: {competition_name}
+Matched events: {matched_events}
+Dates: {date_range}
+City: {city}
+Venue: {venue}
+Address: {venue_address}
+Competition coordinates: {competition_coordinates}
+Straight-line distance: {distance}
+WCA announced at: {announced_at}
+Competition details: {competition_url}{venue_details_line}
+"""
+html_body = """<!doctype html>
+<html lang="en">
+<body>
+  <p>{greeting}</p>
+  <p>WCA has announced a competition that includes one of your followed events.</p>
+  <table cellpadding="6" cellspacing="0" border="0">
+    <tr><th align="left">Competition</th><td>{competition_name}</td></tr>
+    <tr><th align="left">Matched events</th><td><strong>{matched_events}</strong></td></tr>
+    <tr><th align="left">Dates</th><td>{date_range}</td></tr>
+    <tr><th align="left">City</th><td>{city}</td></tr>
+    <tr><th align="left">Venue</th><td>{venue}</td></tr>
+    <tr><th align="left">Address</th><td>{venue_address}</td></tr>
+    <tr><th align="left">Competition coordinates</th><td>{competition_coordinates}</td></tr>
+    <tr><th align="left">Straight-line distance</th><td><strong>{distance}</strong></td></tr>
+    <tr><th align="left">WCA announced at</th><td>{announced_at}</td></tr>
+  </table>
+  <p><a href="{competition_url}">View WCA competition details</a></p>
+  {venue_details_html}
+</body>
+</html>"""
+
+[notification.ja]
+subject = "[WCA 大会告知] {competition_name}"
+text_body = """{greeting}
+
+WCAから、登録した種目を含む大会が新しく告知されました。
+
+大会：{competition_name}
+一致した種目：{matched_events}
+開催日：{date_range}
+都市：{city}
+会場：{venue}
+住所：{venue_address}
+大会座標：{competition_coordinates}
+直線距離：{distance}
+WCA告知日時：{announced_at}
+大会詳細：{competition_url}{venue_details_line}
+"""
+html_body = """<!doctype html>
+<html lang="ja">
+<body>
+  <p>{greeting}</p>
+  <p>WCAから、登録した種目を含む大会が新しく告知されました。</p>
+  <table cellpadding="6" cellspacing="0" border="0">
+    <tr><th align="left">大会</th><td>{competition_name}</td></tr>
+    <tr><th align="left">一致した種目</th><td><strong>{matched_events}</strong></td></tr>
+    <tr><th align="left">開催日</th><td>{date_range}</td></tr>
+    <tr><th align="left">都市</th><td>{city}</td></tr>
+    <tr><th align="left">会場</th><td>{venue}</td></tr>
+    <tr><th align="left">住所</th><td>{venue_address}</td></tr>
+    <tr><th align="left">大会座標</th><td>{competition_coordinates}</td></tr>
+    <tr><th align="left">直線距離</th><td><strong>{distance}</strong></td></tr>
+    <tr><th align="left">WCA告知日時</th><td>{announced_at}</td></tr>
+  </table>
+  <p><a href="{competition_url}">WCA大会の詳細を見る</a></p>
+  {venue_details_html}
+</body>
+</html>"""
+
+[verification.zh]
+subject = "[WCA 比赛提醒] 注册验证码"
+text_body = """你正在注册 WCA 比赛邮件提醒。
+
+验证码：{code}
+验证码 {validity_minutes} 分钟内有效。若非本人操作，请忽略这封邮件。"""
+html_body = """<p>你正在注册 WCA 比赛邮件提醒。</p>
+<p style="font-size:24px;font-weight:bold;letter-spacing:4px">{code}</p>
+<p>验证码 {validity_minutes} 分钟内有效。若非本人操作，请忽略这封邮件。</p>"""
+
+[verification.en]
+subject = "[WCA competition alert] Verification code"
+text_body = """You are registering for WCA competition announcement alerts.
+
+Verification code: {code}
+This code is valid for {validity_minutes} minutes. If you did not request it, ignore this email."""
+html_body = """<p>You are registering for WCA competition announcement alerts.</p>
+<p style="font-size:24px;font-weight:bold;letter-spacing:4px">{code}</p>
+<p>This code is valid for {validity_minutes} minutes. If you did not request it, ignore this email.</p>"""
+
+[verification.ja]
+subject = "[WCA 大会告知] 登録確認コード"
+text_body = """WCA大会告知リマインダーに登録しようとしています。
+
+確認コード：{code}
+このコードは{validity_minutes}分間有効です。心当たりがない場合は、このメールを無視してください。"""
+html_body = """<p>WCA大会告知リマインダーに登録しようとしています。</p>
+<p style="font-size:24px;font-weight:bold;letter-spacing:4px">{code}</p>
+<p>このコードは{validity_minutes}分間有効です。心当たりがない場合は、このメールを無視してください。</p>"""
