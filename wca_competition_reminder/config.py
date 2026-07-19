@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 import os
 import tomllib
@@ -8,8 +10,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from wca_competition_reminder.distance import coordinates_are_valid, haversine_km
 from wca_competition_reminder.events import OFFICIAL_EVENT_IDS
+from wca_competition_reminder.models import MAX_FOLLOW_CONDITIONS, FollowCondition
 
 
 class ConfigurationError(ValueError):
@@ -26,18 +28,83 @@ class RecipientConfig:
     country_names: frozenset[str] | None = None
     continent_names: frozenset[str] | None = None
     max_distance_km: float | None = None
+    additional_conditions: tuple[FollowCondition, ...] = ()
+
+    def __post_init__(self) -> None:
+        if len(self.additional_conditions) >= MAX_FOLLOW_CONDITIONS:
+            raise ValueError(f"a recipient can have at most {MAX_FOLLOW_CONDITIONS} conditions")
+
+    @property
+    def conditions(self) -> tuple[FollowCondition, ...]:
+        return (
+            FollowCondition(
+                latitude=self.latitude,
+                longitude=self.longitude,
+                max_distance_km=self.max_distance_km,
+                event_ids=self.event_ids,
+                country_names=self.country_names,
+                continent_names=self.continent_names,
+            ),
+            *self.additional_conditions,
+        )
+
+    @classmethod
+    def from_conditions(
+        cls,
+        *,
+        email: str,
+        name: str | None,
+        conditions: tuple[FollowCondition, ...],
+    ) -> RecipientConfig:
+        if not conditions:
+            raise ValueError("a recipient must have at least one condition")
+        if len(conditions) > MAX_FOLLOW_CONDITIONS:
+            raise ValueError(f"a recipient can have at most {MAX_FOLLOW_CONDITIONS} conditions")
+        first, *additional = conditions
+        return cls(
+            email=email,
+            latitude=first.latitude,
+            longitude=first.longitude,
+            name=name,
+            event_ids=first.event_ids,
+            country_names=first.country_names,
+            continent_names=first.continent_names,
+            max_distance_km=first.max_distance_km,
+            additional_conditions=tuple(additional),
+        )
 
     def follows_any(self, event_ids: Iterable[str]) -> bool:
-        return self.event_ids is None or not self.event_ids.isdisjoint(event_ids)
+        event_ids = tuple(event_ids)
+        return any(condition.follows_any(event_ids) for condition in self.conditions)
 
     @property
     def has_region_filter(self) -> bool:
-        return self.country_names is not None or self.continent_names is not None
+        return any(condition.has_region_filter for condition in self.conditions)
+
+    def needs_region_for(self, event_ids: Iterable[str]) -> bool:
+        event_ids = tuple(event_ids)
+        return any(
+            condition.follows_any(event_ids) and condition.has_region_filter
+            for condition in self.conditions
+        )
 
     def follows_region(self, country_name: str, continent_name: str) -> bool:
-        return not self.has_region_filter or (
-            (self.country_names is not None and country_name in self.country_names)
-            or (self.continent_names is not None and continent_name in self.continent_names)
+        return any(
+            condition.follows_region(country_name, continent_name)
+            for condition in self.conditions
+        )
+
+    def follows_event_and_region(
+        self,
+        event_ids: Iterable[str],
+        country_name: str,
+        continent_name: str,
+    ) -> bool:
+        event_ids = tuple(event_ids)
+        return any(
+            condition.follows_any(event_ids)
+            and condition.follows_region(country_name, continent_name)
+            for condition in self.conditions
         )
 
     def follows_distance(
@@ -45,22 +112,41 @@ class RecipientConfig:
         competition_latitude: float | None,
         competition_longitude: float | None,
     ) -> bool:
-        if self.max_distance_km is None:
-            return True
-        if not coordinates_are_valid(self.latitude, self.longitude) or not coordinates_are_valid(
-            competition_latitude, competition_longitude
-        ):
-            return False
-        assert self.latitude is not None and self.longitude is not None
-        assert competition_latitude is not None and competition_longitude is not None
-        return (
-            haversine_km(
-                self.latitude,
-                self.longitude,
-                competition_latitude,
-                competition_longitude,
-            )
-            <= self.max_distance_km
+        return any(
+            condition.follows_distance(competition_latitude, competition_longitude)
+            for condition in self.conditions
+        )
+
+    def matching_condition(
+        self,
+        event_ids: Iterable[str],
+        *,
+        country_name: str,
+        continent_name: str,
+        competition_latitude: float | None,
+        competition_longitude: float | None,
+    ) -> FollowCondition | None:
+        event_ids = tuple(event_ids)
+        return next(
+            (
+                condition
+                for condition in self.conditions
+                if condition.matches(
+                    event_ids,
+                    country_name=country_name,
+                    continent_name=continent_name,
+                    competition_latitude=competition_latitude,
+                    competition_longitude=competition_longitude,
+                )
+            ),
+            None,
+        )
+
+    def for_condition(self, condition: FollowCondition) -> RecipientConfig:
+        return RecipientConfig.from_conditions(
+            email=self.email,
+            name=self.name,
+            conditions=(condition,),
         )
 
 
@@ -263,6 +349,70 @@ def _optional_positive_number(
     return number
 
 
+_RECIPIENT_CONDITION_FIELDS = {
+    "latitude",
+    "longitude",
+    "max_distance_km",
+    "events",
+    "countries",
+    "continents",
+}
+
+
+def _recipient_condition(document: dict[str, object], field_name: str) -> FollowCondition:
+    latitude, longitude = _recipient_coordinates(document, field_name)
+    max_distance_km = _optional_positive_number(
+        document,
+        "max_distance_km",
+        f"{field_name}.max_distance_km",
+    )
+    if max_distance_km is not None and latitude is None:
+        raise ConfigurationError(
+            f"{field_name}.latitude and {field_name}.longitude "
+            "are required when max_distance_km is set"
+        )
+    return FollowCondition(
+        latitude=latitude,
+        longitude=longitude,
+        max_distance_km=max_distance_km,
+        event_ids=_recipient_event_ids(document.get("events"), f"{field_name}.events"),
+        country_names=_recipient_region_names(
+            document.get("countries"),
+            f"{field_name}.countries",
+        ),
+        continent_names=_recipient_region_names(
+            document.get("continents"),
+            f"{field_name}.continents",
+        ),
+    )
+
+
+def _recipient_conditions(
+    document: dict[str, object],
+    field_name: str,
+) -> tuple[FollowCondition, ...]:
+    conditions_document = document.get("conditions")
+    if conditions_document is None:
+        return (_recipient_condition(document, field_name),)
+    if any(name in document for name in _RECIPIENT_CONDITION_FIELDS):
+        raise ConfigurationError(
+            f"{field_name} cannot mix top-level condition fields with nested conditions"
+        )
+    if not isinstance(conditions_document, list) or not conditions_document:
+        raise ConfigurationError(f"{field_name}.conditions must be a non-empty array of tables")
+    if len(conditions_document) > MAX_FOLLOW_CONDITIONS:
+        raise ConfigurationError(
+            f"{field_name}.conditions cannot contain more than {MAX_FOLLOW_CONDITIONS} entries"
+        )
+    conditions: list[FollowCondition] = []
+    for index, condition_document in enumerate(conditions_document, start=1):
+        condition_field = f"{field_name}.conditions[{index}]"
+        if not isinstance(condition_document, dict):
+            raise ConfigurationError(f"{condition_field} must be a table")
+        conditions.append(_recipient_condition(condition_document, condition_field))
+    return tuple(conditions)
+
+
 def load_config(path: Path) -> AppConfig:
     try:
         with path.open("rb") as config_file:
@@ -393,39 +543,11 @@ def load_config(path: Path) -> AppConfig:
         if name_value is not None and not isinstance(name_value, str):
             raise ConfigurationError(f"recipients[{index}].name must be a string")
         name = name_value.strip() if isinstance(name_value, str) else None
-        latitude, longitude = _recipient_coordinates(
-            recipient_document,
-            f"recipients[{index}]",
-        )
-        max_distance_km = _optional_positive_number(
-            recipient_document,
-            "max_distance_km",
-            f"recipients[{index}].max_distance_km",
-        )
-        if max_distance_km is not None and latitude is None:
-            raise ConfigurationError(
-                f"recipients[{index}].latitude and recipients[{index}].longitude "
-                "are required when max_distance_km is set"
-            )
         recipients.append(
-            RecipientConfig(
+            RecipientConfig.from_conditions(
                 email=email,
-                latitude=latitude,
-                longitude=longitude,
                 name=name or None,
-                event_ids=_recipient_event_ids(
-                    recipient_document.get("events"),
-                    f"recipients[{index}].events",
-                ),
-                country_names=_recipient_region_names(
-                    recipient_document.get("countries"),
-                    f"recipients[{index}].countries",
-                ),
-                continent_names=_recipient_region_names(
-                    recipient_document.get("continents"),
-                    f"recipients[{index}].continents",
-                ),
-                max_distance_km=max_distance_km,
+                conditions=_recipient_conditions(recipient_document, f"recipients[{index}]"),
             )
         )
 

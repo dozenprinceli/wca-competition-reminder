@@ -50,8 +50,9 @@ def test_send_test_uses_dash_when_recipient_coordinates_are_missing(
     monkeypatch.setattr(cli, "SmtpMailer", RecordingMailer)
 
     assert cli._send_test(config, None) == 0
-    assert "已配置位置：-" in sent[0].text_body
-    assert "已配置位置：-" in sent[0].html_body
+    assert "已配置 1 条关注条件" in sent[0].text_body
+    assert "条件 01：位置 -" in sent[0].text_body
+    assert "条件 01：位置 -" in sent[0].html_body
 
 
 def test_parser_accepts_run_command() -> None:

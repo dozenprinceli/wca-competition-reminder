@@ -411,12 +411,52 @@ function listSummary(values, emptyText) {
   return `${values.slice(0, 3).join("、")} +${values.length - 3}`;
 }
 
+function subscriberConditions(record) {
+  if (Array.isArray(record.conditions) && record.conditions.length) return record.conditions;
+  return [
+    {
+      latitude: record.latitude,
+      longitude: record.longitude,
+      max_distance_km: record.max_distance_km,
+      events: record.events,
+      countries: record.countries,
+      continents: record.continents,
+    },
+  ];
+}
+
+function conditionPreferenceSummary(condition, index) {
+  const events = listSummary(condition.events, "全部项目");
+  const regions = [...(condition.countries || []), ...(condition.continents || [])];
+  return `${String(index + 1).padStart(2, "0")} ${events} / ${listSummary(regions, "全球")}`;
+}
+
+function conditionDistanceSummary(condition, index) {
+  const distance = condition.max_distance_km
+    ? `${formatNumber(condition.max_distance_km)} km`
+    : "不限";
+  const coordinates =
+    condition.latitude !== null && condition.latitude !== undefined
+      ? `${Number(condition.latitude).toFixed(3)}, ${Number(condition.longitude).toFixed(3)}`
+      : "无坐标";
+  return `${String(index + 1).padStart(2, "0")} ${distance} / ${coordinates}`;
+}
+
 function renderSubscribers() {
   if (!appState.snapshot) return;
   const search = document.querySelector("#subscriber-search").value.trim().toLocaleLowerCase();
   const filter = document.querySelector("#subscriber-filter").value;
   const records = subscriberRecords(appState.snapshot).filter((record) => {
-    const searchable = [record.name, record.email, ...(record.events || []), ...(record.countries || [])]
+    const conditions = subscriberConditions(record);
+    const searchable = [
+      record.name,
+      record.email,
+      ...conditions.flatMap((condition) => [
+        ...(condition.events || []),
+        ...(condition.countries || []),
+        ...(condition.continents || []),
+      ]),
+    ]
       .filter(Boolean)
       .join(" ")
       .toLocaleLowerCase();
@@ -451,16 +491,16 @@ function renderSubscribers() {
     const statusLabel = active ? "活动中" : record.source === "config" ? "已覆盖" : "已取消";
     addStatusCell(row, active ? "active" : "inactive", statusLabel);
 
-    const eventSummary = listSummary(record.events, "全部项目");
-    const regions = [...(record.countries || []), ...(record.continents || [])];
-    addTextCell(row, eventSummary, listSummary(regions, "全球"));
+    const conditions = subscriberConditions(record);
+    const preferenceSummaries = conditions.map(conditionPreferenceSummary);
+    addTextCell(
+      row,
+      `${conditions.length} 条条件`,
+      listSummary(preferenceSummaries, "—"),
+    );
 
-    const distance = record.max_distance_km ? `${formatNumber(record.max_distance_km)} km` : "不限";
-    const coordinates =
-      record.latitude !== null && record.latitude !== undefined
-        ? `${Number(record.latitude).toFixed(3)}, ${Number(record.longitude).toFixed(3)}`
-        : null;
-    addTextCell(row, distance, coordinates);
+    const distanceSummaries = conditions.map(conditionDistanceSummary);
+    addTextCell(row, listSummary(distanceSummaries, "—"));
     addTextCell(
       row,
       record.updated_at ? formatDateTime(record.updated_at) : "随配置加载",
@@ -579,15 +619,9 @@ function formatActivityDetails(record) {
   const subscription = details.subscription;
   if (subscription && typeof subscription === "object") {
     if (subscription.name) parts.push(`称呼：${subscription.name}`);
-    parts.push(`项目：${listSummary(subscription.events, "全部")}`);
-    const regions = [...(subscription.countries || []), ...(subscription.continents || [])];
-    parts.push(`地区：${listSummary(regions, "全球")}`);
-    if (subscription.max_distance_km) parts.push(`半径：${subscription.max_distance_km} km`);
-    if (subscription.latitude !== null && subscription.latitude !== undefined) {
-      parts.push(
-        `坐标：${Number(subscription.latitude).toFixed(4)}, ${Number(subscription.longitude).toFixed(4)}`,
-      );
-    }
+    const conditions = subscriberConditions(subscription);
+    parts.push(`关注条件：${conditions.length} 条`);
+    parts.push(`摘要：${listSummary(conditions.map(conditionPreferenceSummary), "—")}`);
     if (subscription.active === false) parts.push("订阅已停用");
   }
 

@@ -1,6 +1,11 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
+
+from wca_competition_reminder.distance import coordinates_are_valid, haversine_km
+
+MAX_FOLLOW_CONDITIONS = 10
 
 
 class CompetitionStatus(StrEnum):
@@ -29,6 +34,67 @@ class WcaCountry:
 
 
 @dataclass(frozen=True, slots=True)
+class FollowCondition:
+    latitude: float | None = None
+    longitude: float | None = None
+    max_distance_km: float | None = None
+    event_ids: frozenset[str] | None = None
+    country_names: frozenset[str] | None = None
+    continent_names: frozenset[str] | None = None
+
+    def follows_any(self, event_ids: Iterable[str]) -> bool:
+        return self.event_ids is None or not self.event_ids.isdisjoint(event_ids)
+
+    @property
+    def has_region_filter(self) -> bool:
+        return self.country_names is not None or self.continent_names is not None
+
+    def follows_region(self, country_name: str, continent_name: str) -> bool:
+        return not self.has_region_filter or (
+            (self.country_names is not None and country_name in self.country_names)
+            or (self.continent_names is not None and continent_name in self.continent_names)
+        )
+
+    def follows_distance(
+        self,
+        competition_latitude: float | None,
+        competition_longitude: float | None,
+    ) -> bool:
+        if self.max_distance_km is None:
+            return True
+        if not coordinates_are_valid(self.latitude, self.longitude) or not coordinates_are_valid(
+            competition_latitude, competition_longitude
+        ):
+            return False
+        assert self.latitude is not None and self.longitude is not None
+        assert competition_latitude is not None and competition_longitude is not None
+        return (
+            haversine_km(
+                self.latitude,
+                self.longitude,
+                competition_latitude,
+                competition_longitude,
+            )
+            <= self.max_distance_km
+        )
+
+    def matches(
+        self,
+        event_ids: Iterable[str],
+        *,
+        country_name: str,
+        continent_name: str,
+        competition_latitude: float | None,
+        competition_longitude: float | None,
+    ) -> bool:
+        return (
+            self.follows_any(event_ids)
+            and self.follows_region(country_name, continent_name)
+            and self.follows_distance(competition_latitude, competition_longitude)
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class SubscriberRecord:
     email: str
     latitude: float | None
@@ -42,6 +108,21 @@ class SubscriberRecord:
     created_at: datetime
     updated_at: datetime
     cancelled_at: datetime | None
+    additional_conditions: tuple[FollowCondition, ...] = ()
+
+    @property
+    def conditions(self) -> tuple[FollowCondition, ...]:
+        return (
+            FollowCondition(
+                latitude=self.latitude,
+                longitude=self.longitude,
+                max_distance_km=self.max_distance_km,
+                event_ids=self.event_ids,
+                country_names=self.country_names,
+                continent_names=self.continent_names,
+            ),
+            *self.additional_conditions,
+        )
 
 
 @dataclass(frozen=True, slots=True)

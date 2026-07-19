@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 from dataclasses import replace
 from datetime import datetime, timedelta
 from http.client import HTTPConnection, HTTPResponse
@@ -76,6 +77,92 @@ def test_subscription_register_query_update_and_cancel(tmp_path: Path) -> None:
 
         with pytest.raises(SubscriptionNotFoundError):
             service.update(subscription_payload())
+
+
+def test_subscription_persists_up_to_ten_ordered_conditions(tmp_path: Path) -> None:
+    conditions = [
+        {
+            "latitude": 31.2304,
+            "longitude": 121.4737,
+            "max_distance_km": 300,
+            "events": ["333"],
+            "countries": ["China"],
+            "continents": [],
+        },
+        {
+            "latitude": 39.9042,
+            "longitude": 116.4074,
+            "max_distance_km": 120,
+            "events": ["minx"],
+            "countries": [],
+            "continents": ["Asia"],
+        },
+    ]
+    payload = {
+        "email": "conditions@example.com",
+        "name": "Condition owner",
+        "notification_consent": True,
+        "conditions": conditions,
+    }
+
+    with StateStore(tmp_path / "state.sqlite3") as state:
+        service = SubscriptionService(state, clock=lambda: NOW)
+        view = service.register(payload)
+
+        assert len(view.conditions) == 2
+        assert view.conditions[0].event_ids == frozenset({"333"})
+        assert view.conditions[1].event_ids == frozenset({"minx"})
+        serialized_conditions = view.to_dict()["conditions"]
+        assert serialized_conditions[0] == {**conditions[0], "continents": None}
+        assert serialized_conditions[1] == {**conditions[1], "countries": None}
+
+        updated = service.update(
+            {
+                **payload,
+                "conditions": [*conditions, *({} for _index in range(8))],
+            }
+        )
+        assert len(updated.conditions) == 10
+        assert [condition.event_ids for condition in updated.conditions[:2]] == [
+            frozenset({"333"}),
+            frozenset({"minx"}),
+        ]
+
+        with sqlite3.connect(tmp_path / "state.sqlite3") as connection:
+            positions = [
+                int(row[0])
+                for row in connection.execute(
+                    """
+                    SELECT position FROM subscriber_conditions
+                    WHERE subscriber_email = ? ORDER BY position
+                    """,
+                    ("conditions@example.com",),
+                ).fetchall()
+            ]
+        assert positions == list(range(10))
+
+
+def test_subscription_condition_count_and_per_condition_validation(tmp_path: Path) -> None:
+    base = {
+        "email": "conditions@example.com",
+        "name": "Condition owner",
+        "notification_consent": True,
+    }
+    with StateStore(tmp_path / "state.sqlite3") as state:
+        service = SubscriptionService(state, clock=lambda: NOW)
+        with pytest.raises(SubscriptionValidationError, match="conditions"):
+            service.register({**base, "conditions": None})
+        with pytest.raises(SubscriptionValidationError, match="1 至 10"):
+            service.register({**base, "conditions": []})
+        with pytest.raises(SubscriptionValidationError, match="最多只能配置 10"):
+            service.register({**base, "conditions": [{} for _index in range(11)]})
+        with pytest.raises(SubscriptionValidationError, match=r"关注条件 2.*经度"):
+            service.register(
+                {
+                    **base,
+                    "conditions": [{}, {"max_distance_km": 100}],
+                }
+            )
 
 
 def test_active_subscription_overwrites_a_cancelled_email(tmp_path: Path) -> None:
@@ -283,9 +370,21 @@ def test_http_verification_and_subscription_endpoints(tmp_path: Path, caplog) ->
         assert "同意接收" in str(body["message"])
 
         register_payload = {
-            **subscription_payload(),
+            "email": "new@example.com",
+            "name": "New competitor",
+            "notification_consent": True,
             "verification_code": "123456",
-            "max_distance_km": 300,
+            "conditions": [
+                {
+                    "latitude": 31.2304,
+                    "longitude": 121.4737,
+                    "max_distance_km": 300,
+                    "events": ["333", "minx"],
+                    "countries": ["China", "Hong Kong, China"],
+                    "continents": ["Asia"],
+                },
+                {"events": ["pyram"]},
+            ],
         }
         response, body = _request_json(
             connection,
@@ -296,6 +395,7 @@ def test_http_verification_and_subscription_endpoints(tmp_path: Path, caplog) ->
         assert response.status == 201
         assert body["subscription"]["email"] == "new@example.com"
         assert body["subscription"]["max_distance_km"] == 300
+        assert len(body["subscription"]["conditions"]) == 2
         assert "management_token" not in body
 
         response, body = _request_json(
@@ -307,17 +407,16 @@ def test_http_verification_and_subscription_endpoints(tmp_path: Path, caplog) ->
         assert body["subscription"]["name"] == "New competitor"
 
         update = {
-            **subscription_payload(),
+            "email": "new@example.com",
             "name": "HTTP updated",
-            "latitude": None,
-            "longitude": None,
-            "max_distance_km": None,
+            "conditions": [{}],
         }
         response, body = _request_json(connection, "PUT", "/api/subscriptions", update)
         assert response.status == 200
         assert body["subscription"]["name"] == "HTTP updated"
         assert body["subscription"]["latitude"] is None
         assert body["subscription"]["max_distance_km"] is None
+        assert len(body["subscription"]["conditions"]) == 1
 
         response, body = _request_json(
             connection,

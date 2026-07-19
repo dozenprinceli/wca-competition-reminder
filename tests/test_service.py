@@ -15,9 +15,10 @@ from tests.conftest import (
     make_details,
     make_summary,
 )
+from wca_competition_reminder.config import RecipientConfig
 from wca_competition_reminder.email_content import build_delivery_drafts
 from wca_competition_reminder.mailer import DeliverySendError
-from wca_competition_reminder.models import CompetitionStatus, WcaCountry
+from wca_competition_reminder.models import CompetitionStatus, FollowCondition, WcaCountry
 from wca_competition_reminder.service import ReminderService
 from wca_competition_reminder.state import StateError, StateStore
 from wca_competition_reminder.wca import WcaApiError
@@ -227,6 +228,98 @@ def test_each_recipient_only_receives_subscribed_events(tmp_path: Path) -> None:
 
     assert [delivery.recipient_email for delivery in mailer.sent] == ["one@example.com"]
     assert "命中的关注项目：三阶魔方 (333)" in mailer.sent[0].text_body
+
+
+def test_filters_from_different_conditions_cannot_form_a_false_match(tmp_path: Path) -> None:
+    base_config = make_config(tmp_path)
+    recipient = RecipientConfig.from_conditions(
+        email="isolated@example.com",
+        name="Isolated",
+        conditions=(
+            FollowCondition(
+                event_ids=frozenset({"333"}),
+                country_names=frozenset({"Japan"}),
+            ),
+            FollowCondition(
+                event_ids=frozenset({"minx"}),
+                country_names=frozenset({"China"}),
+            ),
+        ),
+    )
+    config = replace(base_config, recipients=(recipient,))
+    competition_id = "NoCrossConditionMatch2026"
+    summary = make_summary(
+        competition_id,
+        announced_at=NOW + timedelta(seconds=1),
+        event_ids=["333"],
+    )
+    details = make_details(competition_id, event_ids=["333"], country_iso2="CN")
+    mailer = FakeMailer()
+
+    with StateStore(config.state_path) as state:
+        state.initialize_baseline([], NOW)
+        ReminderService(
+            config,
+            state,
+            FakeWca(recent_future=[summary], details={competition_id: details}),
+            mailer,
+            clock=MutableClock(NOW + timedelta(minutes=1)),
+        ).run_once()
+
+    assert mailer.sent == []
+
+
+def test_any_complete_condition_matches_and_email_uses_first_matching_location(
+    tmp_path: Path,
+) -> None:
+    base_config = make_config(tmp_path)
+    recipient = RecipientConfig.from_conditions(
+        email="or@example.com",
+        name="OR",
+        conditions=(
+            FollowCondition(
+                latitude=31.2304,
+                longitude=121.4737,
+                event_ids=frozenset({"minx"}),
+            ),
+            FollowCondition(
+                latitude=39.9042,
+                longitude=116.4074,
+                max_distance_km=50,
+                event_ids=frozenset({"333"}),
+            ),
+        ),
+    )
+    config = replace(base_config, recipients=(recipient,))
+    competition_id = "SecondConditionMatch2026"
+    summary = make_summary(
+        competition_id,
+        announced_at=NOW + timedelta(seconds=1),
+        event_ids=["333"],
+        latitude=39.9042,
+        longitude=116.4074,
+    )
+    details = make_details(
+        competition_id,
+        event_ids=["333"],
+        latitude=39.9042,
+        longitude=116.4074,
+    )
+    mailer = FakeMailer()
+
+    with StateStore(config.state_path) as state:
+        state.initialize_baseline([], NOW)
+        ReminderService(
+            config,
+            state,
+            FakeWca(recent_future=[summary], details={competition_id: details}),
+            mailer,
+            clock=MutableClock(NOW + timedelta(minutes=1)),
+        ).run_once()
+
+    assert [delivery.recipient_email for delivery in mailer.sent] == ["or@example.com"]
+    assert "命中的关注项目：三阶魔方 (333)" in mailer.sent[0].text_body
+    assert "直线（大圆）距离：0.0 km" in mailer.sent[0].text_body
 
 
 def test_recipient_country_and_continent_filters_form_a_union(tmp_path: Path) -> None:

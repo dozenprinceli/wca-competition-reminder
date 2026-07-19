@@ -237,6 +237,7 @@ def test_forwarded_prefix_scopes_pages_and_admin_cookie(tmp_path: Path) -> None:
         assert "__WCA_AMAP_SECURITY_JS_CODE__" not in page
         assert "__WCA_AMAP_SERVICE_HOST__" not in page
         assert "__WCA_CSP_NONCE__" not in page
+        assert '<style nonce=""></style>' not in page
         assert page_response.getheader("Referrer-Policy") == "same-origin"
         content_security_policy = str(page_response.getheader("Content-Security-Policy"))
         assert "googleapis.com" not in content_security_policy
@@ -287,7 +288,8 @@ def test_index_injects_escaped_google_maps_key_and_picker_markup(tmp_path: Path)
         assert 'name="google-maps-api-key" content="maps-key&amp;&quot;&lt;"' in page
         assert 'name="amap-api-key" content=""' in page
         assert 'name="amap-service-host" content=""' in page
-        assert 'id="location-picker-button"' in page
+        assert 'data-role="location-picker"' in page
+        assert 'id="condition-template"' in page
         assert 'id="location-dialog"' in page
         nonces = re.findall(r'nonce="([^"]+)"', page)
         assert len(nonces) == 3

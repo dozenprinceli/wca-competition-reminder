@@ -173,7 +173,10 @@ class ReminderService:
                 continue
 
             country = None
-            if any(recipient.has_region_filter for recipient in event_recipients):
+            if any(
+                recipient.needs_region_for(official_event_ids)
+                for recipient in event_recipients
+            ):
                 try:
                     country = self._wca.fetch_country(details.country_iso2)
                 except WcaApiError as exc:
@@ -192,7 +195,11 @@ class ReminderService:
                 else tuple(
                     recipient
                     for recipient in event_recipients
-                    if recipient.follows_region(country.name, country.continent_name)
+                    if recipient.follows_event_and_region(
+                        official_event_ids,
+                        country.name,
+                        country.continent_name,
+                    )
                 )
             )
             if not recipients:
@@ -227,12 +234,23 @@ class ReminderService:
                     )
                     continue
 
-            distance_recipients = tuple(
-                recipient
+            country_name = country.name if country is not None else ""
+            continent_name = country.continent_name if country is not None else ""
+            matched_recipients = tuple(
+                recipient.for_condition(condition)
                 for recipient in recipients
-                if recipient.follows_distance(details.latitude, details.longitude)
+                if (
+                    condition := recipient.matching_condition(
+                        official_event_ids,
+                        country_name=country_name,
+                        continent_name=continent_name,
+                        competition_latitude=details.latitude,
+                        competition_longitude=details.longitude,
+                    )
+                )
+                is not None
             )
-            if not distance_recipients:
+            if not matched_recipients:
                 self._state.queue_deliveries(competition_id, details.raw_json, (), now)
                 LOGGER.info(
                     "competition has no recipients within distance id=%s recipients=%d "
@@ -245,7 +263,7 @@ class ReminderService:
 
             drafts = build_delivery_drafts(
                 details,
-                distance_recipients,
+                matched_recipients,
                 from_address=self._config.smtp.from_address,
                 distance_available=coordinates_valid,
             )

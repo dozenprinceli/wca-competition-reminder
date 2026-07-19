@@ -18,8 +18,8 @@ it also includes the straight-line distance; otherwise the distance is shown as 
 ## Highlights
 
 - Supports all 17 official WCA events.
-- Gives every recipient independent event, country/region, continent, and optional distance
-  filters.
+- Gives every recipient up to ten independent event, region, location, and optional distance
+  conditions; any complete condition can trigger one notification.
 - Calculates great-circle distance locally from WCA coordinates. Distance calculation needs
   no maps API; the browser map picker is an optional enhancement.
 - Persists discovery and delivery state in SQLite, with automatic retries for transient
@@ -80,15 +80,23 @@ password = "replace-with-a-strong-admin-password"
 [[recipients]]
 name = "Example recipient"
 email = "recipient@example.com"
+
+[[recipients.conditions]]
 latitude = 31.2304
 longitude = 121.4737
 max_distance_km = 300
 events = "333,minx,pyram"
 countries = ["China", "Hong Kong, China"]
 continents = ["Asia"]
+
+[[recipients.conditions]]
+events = "minx"
+continents = ["Europe"]
 ```
 
-TOML recipient coordinates are also optional: set both values or omit both. Set the optional
+The new TOML format accepts one to ten `[[recipients.conditions]]` tables per recipient. The previous
+top-level recipient filter fields are still read as one condition, but cannot be mixed with
+nested conditions. Coordinates are optional per condition: set both values or omit both. Set the optional
 positive `max_distance_km` value to receive only competitions within that great-circle
 distance. Coordinates are required when the distance filter is set. Without coordinates,
 email distance is shown as `-`.
@@ -189,9 +197,10 @@ that expires after eight hours and is invalidated by a Web service restart. Publ
 must use HTTPS, and `config.toml` should be readable only by the service account. Administrator
 usernames must be unique; add more `[[admins]]` tables when multiple operators need access.
 
-Schema v4 automatically and transactionally migrates an existing v3 SQLite state database on
-startup. Existing subscriptions keep `max_distance_km = NULL`, so their behavior is unchanged.
-Schema v2 and earlier are still rejected because their layouts cannot be upgraded safely.
+Schema v5 automatically and transactionally migrates the current production v4 SQLite state
+database on startup. Every old subscription's location, radius, event, country/region, and
+continent fields are copied in full to position 0 (condition 1), preserving matching behavior.
+Schema v3 and earlier are no longer upgraded automatically.
 
 ## Recipient Filters
 
@@ -225,8 +234,12 @@ less than or equal to the configured radius. If WCA coordinates remain unavailab
 normal retry window, distance-filtered recipients are skipped; recipients without a distance
 filter retain the existing degraded notification behavior.
 
-Event, region, and distance filters are combined: a recipient is notified only when every
-configured filter matches.
+### Multiple conditions
+
+Each recipient has one to ten ordered conditions. Event, region, and distance filters within
+one condition are combined with AND. Conditions are combined with OR, so one complete match
+triggers a single notification. If several conditions match, the first matching condition is
+used for the email's matched-event and distance details.
 
 ## CLI Reference
 

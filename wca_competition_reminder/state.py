@@ -11,31 +11,34 @@ from pathlib import Path
 from wca_competition_reminder.config import RecipientConfig
 from wca_competition_reminder.events import OFFICIAL_EVENT_IDS
 from wca_competition_reminder.models import (
+    MAX_FOLLOW_CONDITIONS,
     CompetitionStatus,
     CompetitionSummary,
     Delivery,
     DeliveryDraft,
     DeliveryStatus,
     DiscoveryStats,
+    FollowCondition,
     PendingCompetition,
     SubscriberRecord,
 )
 from wca_competition_reminder.utils import from_utc_text, retry_at, to_utc_text, utc_now
 from wca_competition_reminder.wca import summary_from_json
 
-SCHEMA_VERSION = 4
-MIGRATABLE_SCHEMA_VERSION = 3
+SCHEMA_VERSION = 5
+MIGRATABLE_SCHEMA_VERSION = 4
 ACTIVITY_LOG_RETENTION_DAYS = 7
 ACTIVITY_LOG_DETAILS_MAX_BYTES = 16 * 1024
 
 _STATE_TABLES = {"app_state", "subscribers", "competitions", "deliveries"}
-_V3_REQUIRED_COLUMNS = {
+_V4_REQUIRED_COLUMNS = {
     "app_state": {"key", "value"},
     "subscribers": {
         "email",
         "name",
         "latitude",
         "longitude",
+        "max_distance_km",
         "event_ids_json",
         "country_names_json",
         "continent_names_json",
@@ -100,6 +103,53 @@ def _decode_filter(value: object, field_name: str) -> frozenset[str] | None:
     if not isinstance(decoded, list) or any(not isinstance(item, str) for item in decoded):
         raise StateError(f"stored subscriber {field_name} must be a string array")
     return frozenset(decoded) or None
+
+
+def _condition_from_row(row: sqlite3.Row) -> FollowCondition:
+    return FollowCondition(
+        latitude=float(row["latitude"]) if row["latitude"] is not None else None,
+        longitude=float(row["longitude"]) if row["longitude"] is not None else None,
+        max_distance_km=(
+            float(row["max_distance_km"]) if row["max_distance_km"] is not None else None
+        ),
+        event_ids=_decode_filter(row["event_ids_json"], "event_ids"),
+        country_names=_decode_filter(row["country_names_json"], "country_names"),
+        continent_names=_decode_filter(row["continent_names_json"], "continent_names"),
+    )
+
+
+def _condition_values(
+    email: str,
+    position: int,
+    condition: FollowCondition,
+) -> tuple[object, ...]:
+    return (
+        email,
+        position,
+        condition.latitude,
+        condition.longitude,
+        condition.max_distance_km,
+        _encode_filter(condition.event_ids),
+        _encode_filter(condition.country_names),
+        _encode_filter(condition.continent_names),
+    )
+
+
+def _condition_dict(condition: FollowCondition) -> dict[str, object]:
+    return {
+        "latitude": condition.latitude,
+        "longitude": condition.longitude,
+        "max_distance_km": condition.max_distance_km,
+        "events": sorted(condition.event_ids) if condition.event_ids is not None else None,
+        "countries": (
+            sorted(condition.country_names) if condition.country_names is not None else None
+        ),
+        "continents": (
+            sorted(condition.continent_names)
+            if condition.continent_names is not None
+            else None
+        ),
+    }
 
 
 class StateStore:
@@ -175,25 +225,48 @@ class StateStore:
             missing_tables = _STATE_TABLES - existing_tables
             missing_columns = {
                 table: required - self._table_columns(table)
-                for table, required in _V3_REQUIRED_COLUMNS.items()
+                for table, required in _V4_REQUIRED_COLUMNS.items()
                 if table in existing_tables and required - self._table_columns(table)
             }
             if missing_tables or missing_columns:
                 raise StateError(
-                    "state database schema version 3 does not match the expected layout; "
+                    "state database schema version 4 does not match the expected layout; "
                     "cannot migrate it safely"
                 )
-            if "max_distance_km" in self._table_columns("subscribers"):
+            if "subscriber_conditions" in existing_tables:
                 raise StateError(
-                    "state database schema version 3 already contains max_distance_km; "
+                    "state database schema version 4 already contains subscriber_conditions; "
                     "cannot migrate it safely"
                 )
 
             self._connection.execute(
                 """
-                ALTER TABLE subscribers
-                ADD COLUMN max_distance_km REAL
-                    CHECK (max_distance_km IS NULL OR max_distance_km > 0)
+                CREATE TABLE subscriber_conditions (
+                    subscriber_email TEXT NOT NULL REFERENCES subscribers(email) ON DELETE CASCADE,
+                    position INTEGER NOT NULL
+                        CHECK (position >= 0 AND position < 10),
+                    latitude REAL CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+                    longitude REAL CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
+                    max_distance_km REAL
+                        CHECK (max_distance_km IS NULL OR max_distance_km > 0),
+                    event_ids_json TEXT,
+                    country_names_json TEXT,
+                    continent_names_json TEXT,
+                    PRIMARY KEY (subscriber_email, position),
+                    CHECK ((latitude IS NULL) = (longitude IS NULL)),
+                    CHECK (max_distance_km IS NULL OR latitude IS NOT NULL)
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                INSERT INTO subscriber_conditions(
+                    subscriber_email, position, latitude, longitude, max_distance_km,
+                    event_ids_json, country_names_json, continent_names_json
+                )
+                SELECT email, 0, latitude, longitude, max_distance_km,
+                       event_ids_json, country_names_json, continent_names_json
+                FROM subscribers
                 """
             )
             self._connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -233,6 +306,22 @@ class StateStore:
 
             CREATE INDEX IF NOT EXISTS subscribers_active
                 ON subscribers(active, updated_at);
+
+            CREATE TABLE IF NOT EXISTS subscriber_conditions (
+                subscriber_email TEXT NOT NULL REFERENCES subscribers(email) ON DELETE CASCADE,
+                position INTEGER NOT NULL
+                    CHECK (position >= 0 AND position < 10),
+                latitude REAL CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+                longitude REAL CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
+                max_distance_km REAL
+                    CHECK (max_distance_km IS NULL OR max_distance_km > 0),
+                event_ids_json TEXT,
+                country_names_json TEXT,
+                continent_names_json TEXT,
+                PRIMARY KEY (subscriber_email, position),
+                CHECK ((latitude IS NULL) = (longitude IS NULL)),
+                CHECK (max_distance_km IS NULL OR latitude IS NOT NULL)
+            );
 
             CREATE TABLE IF NOT EXISTS competitions (
                 id TEXT PRIMARY KEY,
@@ -326,22 +415,30 @@ class StateStore:
         return str(row["value"]) if row is not None else None
 
     @staticmethod
-    def _subscriber_from_row(row: sqlite3.Row) -> SubscriberRecord:
+    def _subscriber_from_row(
+        row: sqlite3.Row,
+        conditions: tuple[FollowCondition, ...],
+    ) -> SubscriberRecord:
         created_at = from_utc_text(str(row["created_at"]))
         updated_at = from_utc_text(str(row["updated_at"]))
         if created_at is None or updated_at is None:
             raise StateError("stored subscriber timestamps are invalid")
+        if not conditions or len(conditions) > MAX_FOLLOW_CONDITIONS:
+            raise StateError(
+                f"stored subscriber {row['email']} must have 1 to "
+                f"{MAX_FOLLOW_CONDITIONS} conditions"
+            )
+        first, *additional = conditions
         return SubscriberRecord(
             email=str(row["email"]),
-            latitude=float(row["latitude"]) if row["latitude"] is not None else None,
-            longitude=float(row["longitude"]) if row["longitude"] is not None else None,
-            max_distance_km=(
-                float(row["max_distance_km"]) if row["max_distance_km"] is not None else None
-            ),
+            latitude=first.latitude,
+            longitude=first.longitude,
+            max_distance_km=first.max_distance_km,
             name=str(row["name"]) if row["name"] is not None else None,
-            event_ids=_decode_filter(row["event_ids_json"], "event_ids"),
-            country_names=_decode_filter(row["country_names_json"], "country_names"),
-            continent_names=_decode_filter(row["continent_names_json"], "continent_names"),
+            event_ids=first.event_ids,
+            country_names=first.country_names,
+            continent_names=first.continent_names,
+            additional_conditions=tuple(additional),
             active=bool(row["active"]),
             created_at=created_at,
             updated_at=updated_at,
@@ -352,11 +449,56 @@ class StateStore:
         row = self._connection.execute(
             "SELECT * FROM subscribers WHERE email = ?", (email,)
         ).fetchone()
-        return self._subscriber_from_row(row) if row is not None else None
+        if row is None:
+            return None
+        return self._subscriber_from_row(row, self._subscriber_conditions(email))
+
+    def _subscriber_conditions(self, email: str) -> tuple[FollowCondition, ...]:
+        condition_rows = self._connection.execute(
+            """
+            SELECT * FROM subscriber_conditions
+            WHERE subscriber_email = ?
+            ORDER BY position
+            """,
+            (email,),
+        ).fetchall()
+        return tuple(_condition_from_row(condition_row) for condition_row in condition_rows)
 
     def list_subscribers(self) -> list[SubscriberRecord]:
         rows = self._connection.execute("SELECT * FROM subscribers ORDER BY email").fetchall()
-        return [self._subscriber_from_row(row) for row in rows]
+        condition_rows = self._connection.execute(
+            "SELECT * FROM subscriber_conditions ORDER BY subscriber_email, position"
+        ).fetchall()
+        conditions_by_email: dict[str, list[FollowCondition]] = {}
+        for condition_row in condition_rows:
+            conditions_by_email.setdefault(str(condition_row["subscriber_email"]), []).append(
+                _condition_from_row(condition_row)
+            )
+        return [
+            self._subscriber_from_row(
+                row,
+                tuple(conditions_by_email.get(str(row["email"]), ())),
+            )
+            for row in rows
+        ]
+
+    def _replace_subscriber_conditions(self, recipient: RecipientConfig) -> None:
+        self._connection.execute(
+            "DELETE FROM subscriber_conditions WHERE subscriber_email = ?",
+            (recipient.email,),
+        )
+        self._connection.executemany(
+            """
+            INSERT INTO subscriber_conditions(
+                subscriber_email, position, latitude, longitude, max_distance_km,
+                event_ids_json, country_names_json, continent_names_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                _condition_values(recipient.email, position, condition)
+                for position, condition in enumerate(recipient.conditions)
+            ),
+        )
 
     def subscriber_count(self, *, active_only: bool = True) -> int:
         if active_only:
@@ -423,6 +565,7 @@ class StateStore:
                         recipient.email,
                     ),
                 )
+            self._replace_subscriber_conditions(recipient)
         return True
 
     def update_subscriber(
@@ -430,26 +573,30 @@ class StateStore:
         recipient: RecipientConfig,
         now: datetime,
     ) -> bool:
-        cursor = self._connection.execute(
-            """
-            UPDATE subscribers
-            SET name = ?, latitude = ?, longitude = ?, max_distance_km = ?, event_ids_json = ?,
-                country_names_json = ?, continent_names_json = ?, updated_at = ?
-            WHERE email = ? AND active = 1
-            """,
-            (
-                recipient.name,
-                recipient.latitude,
-                recipient.longitude,
-                recipient.max_distance_km,
-                _encode_filter(recipient.event_ids),
-                _encode_filter(recipient.country_names),
-                _encode_filter(recipient.continent_names),
-                to_utc_text(now),
-                recipient.email,
-            ),
-        )
-        return cursor.rowcount == 1
+        with self._transaction():
+            cursor = self._connection.execute(
+                """
+                UPDATE subscribers
+                SET name = ?, latitude = ?, longitude = ?, max_distance_km = ?, event_ids_json = ?,
+                    country_names_json = ?, continent_names_json = ?, updated_at = ?
+                WHERE email = ? AND active = 1
+                """,
+                (
+                    recipient.name,
+                    recipient.latitude,
+                    recipient.longitude,
+                    recipient.max_distance_km,
+                    _encode_filter(recipient.event_ids),
+                    _encode_filter(recipient.country_names),
+                    _encode_filter(recipient.continent_names),
+                    to_utc_text(now),
+                    recipient.email,
+                ),
+            )
+            if cursor.rowcount != 1:
+                return False
+            self._replace_subscriber_conditions(recipient)
+        return True
 
     def cancel_subscriber(self, email: str, now: datetime) -> bool:
         timestamp = to_utc_text(now)
@@ -1129,6 +1276,7 @@ class StateStore:
                     if record.continent_names is not None
                     else None
                 ),
+                "conditions": [_condition_dict(condition) for condition in record.conditions],
                 "active": record.active,
                 "created_at": record.created_at.isoformat(),
                 "updated_at": record.updated_at.isoformat(),
@@ -1137,7 +1285,10 @@ class StateStore:
                 ),
             }
             for record in (
-                self._subscriber_from_row(row)
+                self._subscriber_from_row(
+                    row,
+                    self._subscriber_conditions(str(row["email"])),
+                )
                 for row in self._connection.execute(
                     "SELECT * FROM subscribers ORDER BY updated_at DESC LIMIT ?", (limit,)
                 ).fetchall()

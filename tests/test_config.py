@@ -65,6 +65,67 @@ continents = ["Europe"]
     assert config.amap_service_host is None
 
 
+def test_recipient_supports_nested_ordered_conditions(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        """
+[[recipients]]
+email = "conditions@example.com"
+name = "Conditions"
+
+[[recipients.conditions]]
+latitude = 31.2304
+longitude = 121.4737
+max_distance_km = 300
+events = "333"
+countries = ["China"]
+
+[[recipients.conditions]]
+events = "minx"
+continents = ["Europe"]
+""",
+    )
+
+    recipient = load_config(config_path).recipients[0]
+
+    assert len(recipient.conditions) == 2
+    assert recipient.conditions[0].max_distance_km == 300
+    assert recipient.conditions[0].event_ids == frozenset({"333"})
+    assert recipient.conditions[1].event_ids == frozenset({"minx"})
+    assert recipient.conditions[1].continent_names == frozenset({"Europe"})
+
+
+def test_recipient_nested_conditions_reject_mixed_or_more_than_ten_entries(
+    tmp_path: Path,
+) -> None:
+    mixed_path = tmp_path / "mixed.toml"
+    write_config(
+        mixed_path,
+        """
+[[recipients]]
+email = "mixed@example.com"
+events = "333"
+conditions = [{}]
+""",
+    )
+    with pytest.raises(ConfigurationError, match="cannot mix"):
+        load_config(mixed_path)
+
+    too_many_path = tmp_path / "too-many.toml"
+    conditions = "\n".join("[[recipients.conditions]]" for _index in range(11))
+    write_config(
+        too_many_path,
+        f"""
+[[recipients]]
+email = "too-many@example.com"
+{conditions}
+""",
+    )
+    with pytest.raises(ConfigurationError, match="more than 10"):
+        load_config(too_many_path)
+
+
 def test_load_config_reads_optional_google_maps_api_key(tmp_path: Path) -> None:
     config_path = tmp_path / "config.toml"
     write_config(

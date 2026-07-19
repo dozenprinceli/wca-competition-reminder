@@ -1,4 +1,5 @@
 import argparse
+import html
 import logging
 import math
 import signal
@@ -261,15 +262,35 @@ def _send_test(config: AppConfig, password_file: Path | None) -> int:
     domain = config.smtp.from_address.rpartition("@")[2] or "wca-reminder.local"
     with SmtpMailer(config.smtp, password) as mailer:
         for recipient in config.recipients:
-            followed_events = (
-                f"全部 {len(OFFICIAL_EVENT_IDS)} 个 WCA 官方项目"
-                if recipient.event_ids is None
-                else format_event_ids(recipient.event_ids)
-            )
-            configured_location = (
-                f"{recipient.latitude:.6f}, {recipient.longitude:.6f}"
-                if coordinates_are_valid(recipient.latitude, recipient.longitude)
-                else "-"
+            condition_lines: list[str] = []
+            for index, condition in enumerate(recipient.conditions, start=1):
+                followed_events = (
+                    f"全部 {len(OFFICIAL_EVENT_IDS)} 个 WCA 官方项目"
+                    if condition.event_ids is None
+                    else format_event_ids(condition.event_ids)
+                )
+                configured_location = (
+                    f"{condition.latitude:.6f}, {condition.longitude:.6f}"
+                    if coordinates_are_valid(condition.latitude, condition.longitude)
+                    else "-"
+                )
+                regions = sorted(
+                    (condition.country_names or frozenset())
+                    | (condition.continent_names or frozenset())
+                )
+                radius = (
+                    f"{condition.max_distance_km:g} km"
+                    if condition.max_distance_km
+                    else "不限"
+                )
+                condition_lines.append(
+                    f"条件 {index:02d}：位置 {configured_location}；"
+                    f"半径 {radius}；"
+                    f"项目 {followed_events}；地区 {', '.join(regions) if regions else '全球'}"
+                )
+            text_conditions = "\n".join(condition_lines)
+            html_conditions = "".join(
+                f"<li>{html.escape(line)}</li>" for line in condition_lines
             )
             delivery = Delivery(
                 delivery_id=0,
@@ -281,14 +302,13 @@ def _send_test(config: AppConfig, password_file: Path | None) -> int:
                 subject="[WCA 比赛提醒] 配置测试",
                 text_body=(
                     "这是一封配置测试邮件。\n\n"
-                    f"已配置位置：{configured_location}\n"
-                    f"关注项目：{followed_events}\n"
+                    f"已配置 {len(condition_lines)} 条关注条件：\n{text_conditions}\n"
                     "收到此邮件表示 SMTP 与该收件人配置可用。"
                 ),
                 html_body=(
                     "<p>这是一封配置测试邮件。</p>"
-                    f"<p>已配置位置：{configured_location}</p>"
-                    f"<p>关注项目：{followed_events}</p>"
+                    f"<p>已配置 {len(condition_lines)} 条关注条件：</p>"
+                    f"<ol>{html_conditions}</ol>"
                     "<p>收到此邮件表示 SMTP 与该收件人配置可用。</p>"
                 ),
                 created_at=now,

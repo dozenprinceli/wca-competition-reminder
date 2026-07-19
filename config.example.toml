@@ -47,6 +47,10 @@ password = "replace-with-a-strong-admin-password"
 [[recipients]]
 name = "Example recipient"
 email = "recipient@example.com"
+
+# Each recipient has 1 to 10 ordered conditions. A competition is sent when any complete
+# condition matches; events, regions, and distance within one condition are combined with AND.
+[[recipients.conditions]]
 # Coordinates are optional. Set both values or omit both; missing distance is shown as "-".
 latitude = 31.2304
 longitude = 121.4737
@@ -60,6 +64,10 @@ countries = []
 # Values should match the current WCA country/continent catalog.
 continents = []
 # Countries and continents form a union. If both lists are empty or omitted, all regions match.
+
+[[recipients.conditions]]
+events = "minx"
+continents = ["Europe"]
 
 # Add more [[recipients]] tables as needed. Each message is sent separately.
 # This section may be removed when recipients are managed through the browser subscription desk.

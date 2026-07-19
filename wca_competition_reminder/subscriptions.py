@@ -8,7 +8,11 @@ from typing import Any
 
 from wca_competition_reminder.config import RecipientConfig
 from wca_competition_reminder.events import OFFICIAL_EVENT_IDS
-from wca_competition_reminder.models import SubscriberRecord
+from wca_competition_reminder.models import (
+    MAX_FOLLOW_CONDITIONS,
+    FollowCondition,
+    SubscriberRecord,
+)
 from wca_competition_reminder.state import StateStore
 from wca_competition_reminder.utils import utc_now
 
@@ -39,6 +43,7 @@ class SubscriptionView:
     events: tuple[str, ...] | None
     countries: tuple[str, ...] | None
     continents: tuple[str, ...] | None
+    conditions: tuple[FollowCondition, ...]
     active: bool
     created_at: datetime
     updated_at: datetime
@@ -61,6 +66,7 @@ class SubscriptionView:
                 if record.continent_names is not None
                 else None
             ),
+            conditions=record.conditions,
             active=record.active,
             created_at=record.created_at,
             updated_at=record.updated_at,
@@ -68,6 +74,7 @@ class SubscriptionView:
         )
 
     def to_dict(self) -> dict[str, Any]:
+        conditions = [_condition_to_dict(condition) for condition in self.conditions]
         return {
             "email": self.email,
             "name": self.name,
@@ -77,6 +84,7 @@ class SubscriptionView:
             "events": list(self.events) if self.events is not None else None,
             "countries": list(self.countries) if self.countries is not None else None,
             "continents": list(self.continents) if self.continents is not None else None,
+            "conditions": conditions,
             "active": self.active,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
@@ -85,16 +93,28 @@ class SubscriptionView:
 
 
 def recipient_from_record(record: SubscriberRecord) -> RecipientConfig:
-    return RecipientConfig(
+    return RecipientConfig.from_conditions(
         email=record.email,
-        latitude=record.latitude,
-        longitude=record.longitude,
         name=record.name,
-        event_ids=record.event_ids,
-        country_names=record.country_names,
-        continent_names=record.continent_names,
-        max_distance_km=record.max_distance_km,
+        conditions=record.conditions,
     )
+
+
+def _condition_to_dict(condition: FollowCondition) -> dict[str, object]:
+    return {
+        "latitude": condition.latitude,
+        "longitude": condition.longitude,
+        "max_distance_km": condition.max_distance_km,
+        "events": sorted(condition.event_ids) if condition.event_ids is not None else None,
+        "countries": (
+            sorted(condition.country_names) if condition.country_names is not None else None
+        ),
+        "continents": (
+            sorted(condition.continent_names)
+            if condition.continent_names is not None
+            else None
+        ),
+    }
 
 
 def normalize_email(value: object) -> str:
@@ -186,6 +206,52 @@ def _regions(value: object, field_name: str) -> frozenset[str] | None:
     return values
 
 
+_CONDITION_FIELDS = {
+    "latitude",
+    "longitude",
+    "max_distance_km",
+    "events",
+    "countries",
+    "continents",
+}
+
+
+def _condition(payload: dict[str, object], field_name: str) -> FollowCondition:
+    try:
+        latitude, longitude = _coordinates(payload)
+        max_distance_km = _max_distance_km(payload.get("max_distance_km"))
+        if max_distance_km is not None and latitude is None:
+            raise SubscriptionValidationError("设置最远距离时必须同时填写纬度和经度")
+        return FollowCondition(
+            latitude=latitude,
+            longitude=longitude,
+            max_distance_km=max_distance_km,
+            event_ids=_values(payload.get("events"), "events", event_ids=True),
+            country_names=_regions(payload.get("countries"), "countries"),
+            continent_names=_regions(payload.get("continents"), "continents"),
+        )
+    except SubscriptionValidationError as exc:
+        raise SubscriptionValidationError(f"{field_name}：{exc}") from exc
+
+
+def _conditions(payload: dict[str, object]) -> tuple[FollowCondition, ...]:
+    if "conditions" not in payload:
+        return (_condition(payload, "关注条件 1"),)
+    conditions_value = payload["conditions"]
+    if any(name in payload for name in _CONDITION_FIELDS):
+        raise SubscriptionValidationError("不能同时提交 conditions 和顶层关注条件字段")
+    if not isinstance(conditions_value, list) or not conditions_value:
+        raise SubscriptionValidationError("conditions 必须是包含 1 至 10 个条件的数组")
+    if len(conditions_value) > MAX_FOLLOW_CONDITIONS:
+        raise SubscriptionValidationError(f"最多只能配置 {MAX_FOLLOW_CONDITIONS} 个关注条件")
+    conditions: list[FollowCondition] = []
+    for index, condition_payload in enumerate(conditions_value, start=1):
+        if not isinstance(condition_payload, dict):
+            raise SubscriptionValidationError(f"关注条件 {index} 必须是 JSON 对象")
+        conditions.append(_condition(condition_payload, f"关注条件 {index}"))
+    return tuple(conditions)
+
+
 def _recipient(payload: object, *, email: str | None = None) -> RecipientConfig:
     if not isinstance(payload, dict):
         raise SubscriptionValidationError("请求内容必须是 JSON 对象")
@@ -197,19 +263,10 @@ def _recipient(payload: object, *, email: str | None = None) -> RecipientConfig:
         and normalize_email(supplied_email) != email
     ):
         raise SubscriptionValidationError("邮箱地址不能在修改时变更")
-    latitude, longitude = _coordinates(payload)
-    max_distance_km = _max_distance_km(payload.get("max_distance_km"))
-    if max_distance_km is not None and latitude is None:
-        raise SubscriptionValidationError("设置最远距离时必须同时填写纬度和经度")
-    return RecipientConfig(
+    return RecipientConfig.from_conditions(
         email=normalized_email,
-        latitude=latitude,
-        longitude=longitude,
         name=_name(payload.get("name")),
-        event_ids=_values(payload.get("events"), "events", event_ids=True),
-        country_names=_regions(payload.get("countries"), "countries"),
-        continent_names=_regions(payload.get("continents"), "continents"),
-        max_distance_km=max_distance_km,
+        conditions=_conditions(payload),
     )
 
 

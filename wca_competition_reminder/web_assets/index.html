@@ -97,30 +97,9 @@
                 <span class="field-hint" id="email-hint">用于接收比赛公示提醒，也是订阅的唯一标识</span>
               </label>
               <div class="profile-fields" id="profile-fields">
-                <label class="field">
+                <label class="field field-wide">
                   <span class="field-label"><span data-i18n="nameLabel">称呼</span> <b>*</b></span>
                   <input id="name" name="name" type="text" autocomplete="name" maxlength="120" placeholder="例如：Alex" data-i18n-placeholder="namePlaceholder" />
-                </label>
-                <div class="coordinate-fields">
-                  <label class="field">
-                    <span class="field-label" data-i18n="latitudeLabel">纬度</span>
-                    <input id="latitude" name="latitude" type="number" min="-90" max="90" step="any" placeholder="31.2304" />
-                    <span class="field-hint" data-i18n="latitudeHint">可选，需与经度同时填写</span>
-                  </label>
-                  <label class="field">
-                    <span class="field-label" data-i18n="longitudeLabel">经度</span>
-                    <input id="longitude" name="longitude" type="number" min="-180" max="180" step="any" placeholder="121.4737" />
-                    <span class="field-hint" data-i18n="longitudeHint">留空时邮件中的距离显示为 -</span>
-                  </label>
-                  <button class="location-picker-button" id="location-picker-button" type="button">
-                    <span class="location-picker-icon" aria-hidden="true">⌖</span>
-                    <span id="location-picker-label" data-i18n="mapSelectButtonGoogle">从 Google 地图选择</span>
-                  </button>
-                </div>
-                <label class="field">
-                  <span class="field-label" data-i18n="distanceLabel">最远直线距离（km）</span>
-                  <input id="max-distance-km" name="max_distance_km" type="number" min="0.000001" step="any" inputmode="decimal" placeholder="例如：300" data-i18n-placeholder="distancePlaceholder" />
-                  <span class="field-hint" data-i18n="distanceHint">可选；设置后经纬度必填</span>
                 </label>
               </div>
             </div>
@@ -141,37 +120,105 @@
             </div>
 
             <div class="preferences" id="preferences">
-              <div class="section-divider">
+              <div class="section-divider condition-section-heading">
                 <span class="section-index">02</span>
-                <span class="section-title" data-i18n="eventsSection">关注项目</span>
-                <span class="section-note" data-i18n="eventsSectionNote">不选 = 全部项目</span>
+                <span class="section-title" data-i18n="conditionsSection">关注条件</span>
+                <span class="condition-operator" data-i18n="conditionsOperator">任一命中 / OR</span>
+                <span class="section-note" data-i18n="conditionsSectionNote">最多 10 条</span>
               </div>
-              <fieldset class="choice-grid event-grid" id="event-options">
-                <legend class="sr-only" data-i18n="eventsLegend">选择 WCA 项目</legend>
-                <span class="loading-copy" data-i18n="loadingEvents">正在载入项目列表…</span>
-              </fieldset>
-
-              <div class="section-divider region-divider">
-                <span class="section-index">03</span>
-                <span class="section-title" data-i18n="regionsSection">地区筛选</span>
-                <span class="section-note" data-i18n="regionsSectionNote">已设置的筛选条件同时生效</span>
-              </div>
-              <div class="region-grid">
-                <label class="field">
-                  <span class="field-label" data-i18n="countryLabel">国家 / 地区</span>
-                  <input id="country-search" type="search" autocomplete="off" placeholder="搜索 WCA 国家或地区" data-i18n-placeholder="countryPlaceholder" />
-                  <span class="field-hint" id="country-count">正在从 WCA 载入目录…</span>
-                  <div class="country-options" id="country-options" aria-label="WCA 国家和地区" data-i18n-aria-label="countryOptionsLabel"></div>
-                </label>
-                <fieldset class="field continent-field">
-                  <legend class="field-label" data-i18n="continentLabel">大洲</legend>
-                  <div class="continent-options" id="continent-options">
-                    <span class="loading-copy" data-i18n="loadingContinents">正在载入…</span>
-                  </div>
-                  <span class="field-hint" data-i18n="continentHint">不选表示不限制大洲</span>
-                </fieldset>
-              </div>
+              <div class="condition-list" id="condition-list"></div>
+              <button class="add-condition-button" id="add-condition-button" type="button">
+                <span class="add-condition-symbol" aria-hidden="true">＋</span>
+                <span data-i18n="addCondition">添加关注条件</span>
+                <span class="condition-count" id="condition-count">1 / 10</span>
+              </button>
             </div>
+
+            <template id="condition-template">
+              <section class="condition-card">
+                <header class="condition-card-header">
+                  <button class="condition-toggle" type="button" data-role="condition-toggle" aria-expanded="true">
+                    <span class="condition-number" data-role="condition-number">01</span>
+                    <span class="condition-heading-copy">
+                      <b data-role="condition-title">关注条件 1</b>
+                      <small data-role="condition-summary">全部项目 · 全球 · 不限距离</small>
+                    </span>
+                    <span class="condition-disclosure" aria-hidden="true"></span>
+                  </button>
+                  <button class="condition-remove" type="button" data-role="condition-remove" aria-label="删除关注条件">
+                    <span aria-hidden="true">×</span>
+                  </button>
+                </header>
+
+                <div class="condition-body" data-role="condition-body">
+                  <div class="condition-subsection">
+                    <div class="condition-subheading">
+                      <span class="condition-subindex">A</span>
+                      <span data-i18n="distanceSection">位置与距离</span>
+                      <small data-i18n="distanceSectionNote">可选</small>
+                    </div>
+                    <div class="condition-distance-grid">
+                      <div class="coordinate-fields">
+                        <label class="field">
+                          <span class="field-label" data-i18n="latitudeLabel">纬度</span>
+                          <input data-role="latitude" type="number" min="-90" max="90" step="any" placeholder="31.2304" />
+                          <span class="field-hint" data-i18n="latitudeHint">可选，需与经度同时填写</span>
+                        </label>
+                        <label class="field">
+                          <span class="field-label" data-i18n="longitudeLabel">经度</span>
+                          <input data-role="longitude" type="number" min="-180" max="180" step="any" placeholder="121.4737" />
+                          <span class="field-hint" data-i18n="longitudeHint">留空时邮件中的距离显示为 -</span>
+                        </label>
+                        <button class="location-picker-button" data-role="location-picker" type="button">
+                          <span class="location-picker-icon" aria-hidden="true">⌖</span>
+                          <span data-role="location-picker-label" data-i18n="mapSelectButtonGoogle">从 Google 地图选择</span>
+                        </button>
+                      </div>
+                      <label class="field">
+                        <span class="field-label" data-i18n="distanceLabel">最远直线距离（km）</span>
+                        <input data-role="max-distance" type="number" min="0.000001" step="any" inputmode="decimal" placeholder="例如：300" data-i18n-placeholder="distancePlaceholder" />
+                        <span class="field-hint" data-i18n="distanceHint">可选；设置后经纬度必填</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="condition-subsection">
+                    <div class="condition-subheading">
+                      <span class="condition-subindex">B</span>
+                      <span data-i18n="eventsSection">关注项目</span>
+                      <small data-i18n="eventsSectionNote">不选 = 全部项目</small>
+                    </div>
+                    <fieldset class="choice-grid event-grid" data-role="event-options">
+                      <legend class="sr-only" data-i18n="eventsLegend">选择 WCA 项目</legend>
+                      <span class="loading-copy" data-i18n="loadingEvents">正在载入项目列表…</span>
+                    </fieldset>
+                  </div>
+
+                  <div class="condition-subsection">
+                    <div class="condition-subheading">
+                      <span class="condition-subindex">C</span>
+                      <span data-i18n="regionsSection">地区筛选</span>
+                      <small data-i18n="regionsSectionNote">国家与大洲取并集</small>
+                    </div>
+                    <div class="region-grid">
+                      <label class="field">
+                        <span class="field-label" data-i18n="countryLabel">国家 / 地区</span>
+                        <input data-role="country-search" type="search" autocomplete="off" placeholder="搜索 WCA 国家或地区" data-i18n-placeholder="countryPlaceholder" />
+                        <span class="field-hint" data-role="country-count">正在从 WCA 载入目录…</span>
+                        <div class="country-options" data-role="country-options" aria-label="WCA 国家和地区" data-i18n-aria-label="countryOptionsLabel"></div>
+                      </label>
+                      <fieldset class="field continent-field">
+                        <legend class="field-label" data-i18n="continentLabel">大洲</legend>
+                        <div class="continent-options" data-role="continent-options">
+                          <span class="loading-copy" data-i18n="loadingContinents">正在载入…</span>
+                        </div>
+                        <span class="field-hint" data-i18n="continentHint">不选表示不限制大洲</span>
+                      </fieldset>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </template>
 
             <div class="form-footer">
               <label class="consent-control" id="notification-consent-field">

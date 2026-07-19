@@ -112,12 +112,27 @@ const TRANSLATIONS = {
     verificationPlaceholder: "6 位验证码",
     verificationHint: "验证码 5 分钟内有效",
     loadedSubscription: "当前订阅已载入",
+    conditionsSection: "关注条件",
+    conditionsOperator: "任一命中 / OR",
+    conditionsSectionNote: "最多 10 条",
+    addCondition: "添加关注条件",
+    conditionTitle: "关注条件 {{number}}",
+    removeCondition: "删除关注条件 {{number}}",
+    distanceSection: "位置与距离",
+    distanceSectionNote: "可选",
+    summaryAllEvents: "全部项目",
+    summaryEventCount: "{{count}} 个项目",
+    summaryGlobal: "全球",
+    summaryRegionCount: "{{count}} 个地区",
+    summaryUnlimitedDistance: "不限距离",
+    summaryDistanceRadius: "{{distance}} km 内",
+    conditionLimitReached: "最多只能配置 10 个关注条件。",
     eventsSection: "关注项目",
     eventsSectionNote: "不选 = 全部项目",
     eventsLegend: "选择 WCA 项目",
     loadingEvents: "正在载入项目列表…",
     regionsSection: "地区筛选",
-    regionsSectionNote: "已设置的筛选条件同时生效",
+    regionsSectionNote: "国家与大洲取并集",
     countryLabel: "国家 / 地区",
     countryPlaceholder: "搜索 WCA 国家或地区",
     countryOptionsLabel: "WCA 国家和地区",
@@ -128,12 +143,12 @@ const TRANSLATIONS = {
     consent: "我同意接收 WCA 比赛公示提醒邮件",
     activeChannels: "个活动订阅通道",
     healthFootnote: "服务每分钟检查一次 WCA 新公示比赛。",
-    logicEventTitle: "项目命中",
-    logicEventCopy: "只看你选中的 WCA 项目",
-    logicRegionTitle: "地区命中",
-    logicRegionCopy: "比赛所在国家/地区或大洲匹配",
-    logicDistanceTitle: "距离命中",
-    logicDistanceCopy: "可选，仅提醒设定半径内比赛",
+    logicEventTitle: "条件内匹配",
+    logicEventCopy: "项目、地区与距离在同一条内核对",
+    logicRegionTitle: "任一条件",
+    logicRegionCopy: "一条完整命中即可进入推送",
+    logicDistanceTitle: "命中位置",
+    logicDistanceCopy: "邮件距离采用首条命中条件",
     logicDeliveryTitle: "邮件送达",
     logicDeliveryCopy: "自动重试临时投递失败",
     registerKicker: "NEW CHANNEL",
@@ -243,12 +258,27 @@ const TRANSLATIONS = {
     verificationPlaceholder: "6-digit code",
     verificationHint: "Code valid for 5 minutes",
     loadedSubscription: "Current subscription loaded",
+    conditionsSection: "Alert conditions",
+    conditionsOperator: "ANY MATCH / OR",
+    conditionsSectionNote: "Up to 10",
+    addCondition: "Add alert condition",
+    conditionTitle: "Alert condition {{number}}",
+    removeCondition: "Remove alert condition {{number}}",
+    distanceSection: "Location and distance",
+    distanceSectionNote: "Optional",
+    summaryAllEvents: "All events",
+    summaryEventCount: "{{count}} events",
+    summaryGlobal: "Worldwide",
+    summaryRegionCount: "{{count}} regions",
+    summaryUnlimitedDistance: "Any distance",
+    summaryDistanceRadius: "Within {{distance}} km",
+    conditionLimitReached: "You can configure up to 10 alert conditions.",
     eventsSection: "Events",
     eventsSectionNote: "None selected = all events",
     eventsLegend: "Choose WCA events",
     loadingEvents: "Loading event list…",
     regionsSection: "Region filters",
-    regionsSectionNote: "All selected filters apply together",
+    regionsSectionNote: "Countries and continents are combined",
     countryLabel: "Country / region",
     countryPlaceholder: "Search WCA countries or regions",
     countryOptionsLabel: "WCA countries and regions",
@@ -259,12 +289,12 @@ const TRANSLATIONS = {
     consent: "I agree to receive WCA competition announcement alert emails",
     activeChannels: "active subscription channels",
     healthFootnote: "The service checks for newly announced WCA competitions every minute.",
-    logicEventTitle: "Event match",
-    logicEventCopy: "Only the WCA events you selected",
-    logicRegionTitle: "Region match",
-    logicRegionCopy: "Match the competition's country, region, or continent",
-    logicDistanceTitle: "Distance match",
-    logicDistanceCopy: "Optional; only notify within your radius",
+    logicEventTitle: "Within a condition",
+    logicEventCopy: "Events, region, and distance match together",
+    logicRegionTitle: "Any condition",
+    logicRegionCopy: "One complete match moves to delivery",
+    logicDistanceTitle: "Matched location",
+    logicDistanceCopy: "Email distance uses the first match",
     logicDeliveryTitle: "Email delivery",
     logicDeliveryCopy: "Temporary delivery failures are retried automatically",
     registerKicker: "NEW CHANNEL",
@@ -374,12 +404,27 @@ const TRANSLATIONS = {
     verificationPlaceholder: "6桁の認証コード",
     verificationHint: "コードの有効期限は5分です",
     loadedSubscription: "現在の登録を読み込みました",
+    conditionsSection: "通知条件",
+    conditionsOperator: "いずれか一致 / OR",
+    conditionsSectionNote: "最大10件",
+    addCondition: "通知条件を追加",
+    conditionTitle: "通知条件 {{number}}",
+    removeCondition: "通知条件 {{number}} を削除",
+    distanceSection: "場所と距離",
+    distanceSectionNote: "任意",
+    summaryAllEvents: "全種目",
+    summaryEventCount: "{{count}} 種目",
+    summaryGlobal: "全地域",
+    summaryRegionCount: "{{count}} 地域",
+    summaryUnlimitedDistance: "距離制限なし",
+    summaryDistanceRadius: "{{distance}} km以内",
+    conditionLimitReached: "通知条件は最大10件まで設定できます。",
     eventsSection: "対象種目",
     eventsSectionNote: "未選択 = すべての種目",
     eventsLegend: "WCA種目を選択",
     loadingEvents: "種目一覧を読み込んでいます…",
     regionsSection: "地域フィルター",
-    regionsSectionNote: "選択した条件をすべて適用",
+    regionsSectionNote: "国・地域と大陸はOR条件",
     countryLabel: "国 / 地域",
     countryPlaceholder: "WCAの国または地域を検索",
     countryOptionsLabel: "WCAの国と地域",
@@ -390,12 +435,12 @@ const TRANSLATIONS = {
     consent: "WCA大会告知リマインダーメールを受け取ることに同意します",
     activeChannels: "件の有効な登録",
     healthFootnote: "サービスは毎分、WCAの新しい大会告知を確認します。",
-    logicEventTitle: "種目の一致",
-    logicEventCopy: "選択したWCA種目だけを対象",
-    logicRegionTitle: "地域の一致",
-    logicRegionCopy: "大会の国・地域または大陸が一致",
-    logicDistanceTitle: "距離の一致",
-    logicDistanceCopy: "任意。設定した半径内の大会のみ通知",
+    logicEventTitle: "条件内の一致",
+    logicEventCopy: "種目・地域・距離を同じ条件内で照合",
+    logicRegionTitle: "いずれかの条件",
+    logicRegionCopy: "1件が完全一致すると配信対象",
+    logicDistanceTitle: "一致した場所",
+    logicDistanceCopy: "メール距離は最初の一致条件を使用",
     logicDeliveryTitle: "メール配信",
     logicDeliveryCopy: "一時的な配信失敗は自動で再試行",
     registerKicker: "新規登録",
@@ -615,7 +660,11 @@ const state = {
     countries: [],
   },
   optionsLoaded: false,
-  selectedCountries: new Set(),
+  conditionCountries: new Map(),
+  conditionEvents: new Map(),
+  conditionContinents: new Map(),
+  nextConditionId: 1,
+  activeLocationConditionId: null,
   toastTimer: null,
   toastMessageFactory: null,
   verificationTimer: null,
@@ -627,10 +676,6 @@ const state = {
 const form = document.querySelector("#subscription-form");
 const emailInput = document.querySelector("#email");
 const nameInput = document.querySelector("#name");
-const latitudeInput = document.querySelector("#latitude");
-const longitudeInput = document.querySelector("#longitude");
-const locationPickerButton = document.querySelector("#location-picker-button");
-const locationPickerLabel = document.querySelector("#location-picker-label");
 const locationDialog = document.querySelector("#location-dialog");
 const locationDialogClose = document.querySelector("#location-dialog-close");
 const locationDialogCancel = document.querySelector("#location-dialog-cancel");
@@ -638,12 +683,9 @@ const locationDialogConfirm = document.querySelector("#location-dialog-confirm")
 const locationMapElement = document.querySelector("#location-map");
 const locationMapStatus = document.querySelector("#location-map-status");
 const locationSelectedCoordinates = document.querySelector("#location-selected-coordinates");
-const maxDistanceInput = document.querySelector("#max-distance-km");
 const verificationCodeInput = document.querySelector("#verification-code");
 const notificationConsentInput = document.querySelector("#notification-consent");
 const notificationConsentField = document.querySelector("#notification-consent-field");
-const countrySearch = document.querySelector("#country-search");
-const countryOptions = document.querySelector("#country-options");
 const profileFields = document.querySelector("#profile-fields");
 const verificationField = document.querySelector("#verification-field");
 const preferences = document.querySelector("#preferences");
@@ -655,6 +697,10 @@ const submitLabel = document.querySelector("#submit-label");
 const submitSymbol = document.querySelector("#submit-symbol");
 const toast = document.querySelector("#toast");
 const languageButtons = document.querySelectorAll(".language-button");
+const conditionList = document.querySelector("#condition-list");
+const conditionTemplate = document.querySelector("#condition-template");
+const addConditionButton = document.querySelector("#add-condition-button");
+const conditionCount = document.querySelector("#condition-count");
 
 let googleMapsPromise = null;
 let googleMapsRequestedLocale = null;
@@ -805,15 +851,20 @@ function applyMapProviderCopy() {
   const provider = currentMapProvider();
   const selectKey = mapCopyKey("mapSelectButton", provider);
   const regionKey = mapCopyKey("mapRegionLabel", provider);
-  locationPickerLabel.dataset.i18n = selectKey;
-  locationPickerLabel.textContent = t(selectKey);
+  document.querySelectorAll('[data-role="location-picker"]').forEach((button) => {
+    const label = button.querySelector('[data-role="location-picker-label"]');
+    if (label) {
+      label.dataset.i18n = selectKey;
+      label.textContent = t(selectKey);
+    }
+    if (mapProviderConfigured(provider)) {
+      button.removeAttribute("title");
+    } else {
+      button.setAttribute("title", t(mapCopyKey("mapNotConfigured", provider)));
+    }
+  });
   locationMapElement.dataset.i18nAriaLabel = regionKey;
   locationMapElement.setAttribute("aria-label", t(regionKey));
-  if (mapProviderConfigured(provider)) {
-    locationPickerButton.removeAttribute("title");
-  } else {
-    locationPickerButton.setAttribute("title", t(mapCopyKey("mapNotConfigured", provider)));
-  }
 }
 
 function setPreferredMapProvider(provider) {
@@ -884,7 +935,17 @@ function showTranslationToast(key, isError = false, variables = {}) {
   showToast(messageFactory(), isError, messageFactory);
 }
 
-function coordinatesFromInputs() {
+function activeLocationCondition() {
+  if (!state.activeLocationConditionId) return null;
+  return conditionList.querySelector(
+    `.condition-card[data-condition-id="${state.activeLocationConditionId}"]`,
+  );
+}
+
+function coordinatesFromInputs(conditionCard = activeLocationCondition()) {
+  if (!conditionCard) return null;
+  const latitudeInput = conditionCard.querySelector('[data-role="latitude"]');
+  const longitudeInput = conditionCard.querySelector('[data-role="longitude"]');
   const latitudeText = latitudeInput.value.trim();
   const longitudeText = longitudeInput.value.trim();
   if (!latitudeText || !longitudeText) return null;
@@ -1337,7 +1398,8 @@ async function initializeAmapLocationMap(AMap) {
   syncAmapLocationSelection(AMap);
 }
 
-async function openLocationDialog() {
+async function openLocationDialog(conditionCard) {
+  if (!conditionCard) return;
   const provider = currentMapProvider();
   if (!mapProviderConfigured(provider)) {
     showTranslationToast(mapCopyKey("mapNotConfigured", provider), true);
@@ -1345,6 +1407,7 @@ async function openLocationDialog() {
   }
 
   activeMapProvider = provider;
+  state.activeLocationConditionId = conditionCard.dataset.conditionId;
   applyMapProviderCopy();
   locationDialogGeneration += 1;
   const generation = locationDialogGeneration;
@@ -1382,6 +1445,10 @@ function closeLocationDialog() {
 
 function confirmLocationSelection() {
   if (!pendingLocation) return;
+  const conditionCard = activeLocationCondition();
+  if (!conditionCard) return;
+  const latitudeInput = conditionCard.querySelector('[data-role="latitude"]');
+  const longitudeInput = conditionCard.querySelector('[data-role="longitude"]');
   latitudeInput.value = coordinateValue(pendingLocation.lat);
   longitudeInput.value = coordinateValue(pendingLocation.lng);
   [latitudeInput, longitudeInput].forEach((input) => {
@@ -1389,6 +1456,7 @@ function confirmLocationSelection() {
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
+  updateConditionSummary(conditionCard);
   closeLocationDialog();
   showTranslationToast("mapSelectionSaved");
 }
@@ -1420,26 +1488,19 @@ function localizedErrorMessage(error, fallbackKey = "operationFailure") {
 }
 
 function clearInvalidState() {
-  [
-    emailInput,
-    nameInput,
-    latitudeInput,
-    longitudeInput,
-    maxDistanceInput,
-    verificationCodeInput,
-    notificationConsentInput,
-  ].forEach((input) => {
+  [emailInput, nameInput, verificationCodeInput, notificationConsentInput].forEach((input) => {
     input.removeAttribute("aria-invalid");
+  });
+  conditionList.querySelectorAll('[aria-invalid="true"]').forEach((input) => {
+    input.removeAttribute("aria-invalid");
+  });
+  conditionList.querySelectorAll(".condition-card.has-error").forEach((conditionCard) => {
+    conditionCard.classList.remove("has-error");
   });
 }
 
 function resetSelections() {
-  document.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-    input.checked = false;
-  });
-  state.selectedCountries.clear();
-  countrySearch.value = "";
-  renderCountries();
+  renderConditions([emptyCondition()]);
 }
 
 function setProfileVisible(visible) {
@@ -1509,72 +1570,149 @@ function makeChoice({ name, value, label, code = "" }) {
   return wrapper;
 }
 
-function renderOptions() {
-  const selectedEvents = new Set(selectedValues("events"));
-  const selectedContinents = new Set(selectedValues("continents"));
-  const eventContainer = document.querySelector("#event-options");
+function emptyCondition() {
+  return {
+    latitude: null,
+    longitude: null,
+    max_distance_km: null,
+    events: [],
+    countries: [],
+    continents: [],
+  };
+}
+
+function normalizeCondition(condition = {}) {
+  return {
+    latitude: condition.latitude ?? null,
+    longitude: condition.longitude ?? null,
+    max_distance_km: condition.max_distance_km ?? null,
+    events: Array.isArray(condition.events) ? condition.events : [],
+    countries: Array.isArray(condition.countries) ? condition.countries : [],
+    continents: Array.isArray(condition.continents) ? condition.continents : [],
+  };
+}
+
+function conditionCards() {
+  return [...conditionList.querySelectorAll(".condition-card")];
+}
+
+function translateWithin(root) {
+  root.querySelectorAll("[data-i18n]").forEach((element) => {
+    element.textContent = t(element.dataset.i18n);
+  });
+  root.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+    element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
+  });
+  root.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+    element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel));
+  });
+}
+
+function checkedValues(container) {
+  return [...container.querySelectorAll('input[type="checkbox"]:checked')].map(
+    (input) => input.value,
+  );
+}
+
+function localizedEventLabel(event, id) {
+  return (
+    (state.language === "en"
+      ? EVENT_LABELS_EN[id]
+      : state.language === "ja"
+        ? EVENT_LABELS_JA[id]
+        : EVENT_LABELS[id]) ||
+    (state.language === "en" || state.language === "ja"
+      ? id
+      : typeof event === "object"
+        ? event.name
+        : id)
+  );
+}
+
+function renderConditionOptions(conditionCard, condition = null) {
+  const eventContainer = conditionCard.querySelector('[data-role="event-options"]');
+  const continentContainer = conditionCard.querySelector('[data-role="continent-options"]');
+  const id = conditionCard.dataset.conditionId;
+  const selectedEvents = new Set(
+    condition
+      ? normalizeCondition(condition).events
+      : state.conditionEvents.get(id) || checkedValues(eventContainer),
+  );
+  const selectedContinents = new Set(
+    condition
+      ? normalizeCondition(condition).continents
+      : state.conditionContinents.get(id) || checkedValues(continentContainer),
+  );
+  state.conditionEvents.set(id, selectedEvents);
+  state.conditionContinents.set(id, selectedContinents);
+
   eventContainer.replaceChildren();
   state.options.events.forEach((event) => {
-    const id = typeof event === "string" ? event : event.id;
+    const eventId = typeof event === "string" ? event : event.id;
     const choice = makeChoice({
-      name: "events",
-      value: id,
-      label:
-        (state.language === "en"
-          ? EVENT_LABELS_EN[id]
-          : state.language === "ja"
-            ? EVENT_LABELS_JA[id]
-            : EVENT_LABELS[id]) ||
-        (state.language === "en" || state.language === "ja"
-          ? id
-          : typeof event === "object"
-            ? event.name
-            : id),
-      code: id,
+      name: `condition-${id}-events`,
+      value: eventId,
+      label: localizedEventLabel(event, eventId),
+      code: eventId,
     });
-    choice.querySelector("input").checked = selectedEvents.has(id);
+    choice.querySelector("input").checked = selectedEvents.has(eventId);
     eventContainer.append(choice);
   });
 
-  const continentContainer = document.querySelector("#continent-options");
   continentContainer.replaceChildren();
   state.options.continents.forEach((continent) => {
-    const choice = makeChoice({ name: "continents", value: continent, label: continent });
+    const choice = makeChoice({
+      name: `condition-${id}-continents`,
+      value: continent,
+      label: continent,
+    });
     choice.querySelector("input").checked = selectedContinents.has(continent);
     continentContainer.append(choice);
   });
-  renderCountries();
+  renderCountries(conditionCard);
 }
 
-function matchingCountries(query = countrySearch.value.trim().toLowerCase()) {
+function matchingCountries(conditionCard) {
+  const query = conditionCard
+    .querySelector('[data-role="country-search"]')
+    .value.trim()
+    .toLowerCase();
   return state.options.countries.filter((country) => {
     if (!query) return true;
     return `${country.name} ${country.iso2} ${country.continent}`.toLowerCase().includes(query);
   });
 }
 
-function updateCountryCount(visibleCount = matchingCountries().length) {
+function updateCountryCount(conditionCard, visibleCount = matchingCountries(conditionCard).length) {
+  const countElement = conditionCard.querySelector('[data-role="country-count"]');
   const total = state.options.countries.length;
   if (!total) {
-    setText("#country-count", t(state.optionsLoaded ? "countryDirectoryUnavailable" : "loadingCountries"));
+    countElement.textContent = t(
+      state.optionsLoaded ? "countryDirectoryUnavailable" : "loadingCountries",
+    );
     return;
   }
-  const count = state.selectedCountries.size ? state.selectedCountries.size : visibleCount;
-  setText("#country-count", t("countryCount", { count, total }));
+  const selectedCountries =
+    state.conditionCountries.get(conditionCard.dataset.conditionId) || new Set();
+  const count = selectedCountries.size || visibleCount;
+  countElement.textContent = t("countryCount", { count, total });
 }
 
-function renderCountries(query = countrySearch.value.trim().toLowerCase()) {
+function renderCountries(conditionCard) {
+  const countryOptions = conditionCard.querySelector('[data-role="country-options"]');
+  const countries = matchingCountries(conditionCard);
+  const selectedCountries =
+    state.conditionCountries.get(conditionCard.dataset.conditionId) || new Set();
   countryOptions.replaceChildren();
-  const countries = matchingCountries(query);
-  updateCountryCount(countries.length);
+  updateCountryCount(conditionCard, countries.length);
   countries.forEach((country) => {
     const choice = makeChoice({
-      name: "countries",
+      name: `condition-${conditionCard.dataset.conditionId}-countries`,
       value: country.name,
       label: country.name,
       code: country.iso2,
     });
-    choice.querySelector("input").checked = state.selectedCountries.has(country.name);
+    choice.querySelector("input").checked = selectedCountries.has(country.name);
     countryOptions.append(choice);
   });
   if (!countries.length) {
@@ -1583,6 +1721,147 @@ function renderCountries(query = countrySearch.value.trim().toLowerCase()) {
     empty.textContent = state.options.countries.length ? t("noCountryMatch") : t("retryLater");
     countryOptions.append(empty);
   }
+}
+
+function setConditionExpanded(conditionCard, expanded) {
+  conditionCard.classList.toggle("is-collapsed", !expanded);
+  conditionCard.querySelector('[data-role="condition-toggle"]').setAttribute(
+    "aria-expanded",
+    String(expanded),
+  );
+  conditionCard.querySelector('[data-role="condition-body"]').hidden = !expanded;
+}
+
+function updateConditionSummary(conditionCard) {
+  const eventCount = checkedValues(
+    conditionCard.querySelector('[data-role="event-options"]'),
+  ).length;
+  const continentCount = checkedValues(
+    conditionCard.querySelector('[data-role="continent-options"]'),
+  ).length;
+  const countryCountValue = (
+    state.conditionCountries.get(conditionCard.dataset.conditionId) || new Set()
+  ).size;
+  const distanceValue = conditionCard.querySelector('[data-role="max-distance"]').value.trim();
+  const distance = Number(distanceValue);
+  const eventSummary = eventCount ? t("summaryEventCount", { count: eventCount }) : t("summaryAllEvents");
+  const regionCount = countryCountValue + continentCount;
+  const regionSummary = regionCount
+    ? t("summaryRegionCount", { count: regionCount })
+    : t("summaryGlobal");
+  const distanceSummary =
+    distanceValue && Number.isFinite(distance) && distance > 0
+      ? t("summaryDistanceRadius", { distance: distanceValue })
+      : t("summaryUnlimitedDistance");
+  conditionCard.querySelector('[data-role="condition-summary"]').textContent = [
+    eventSummary,
+    regionSummary,
+    distanceSummary,
+  ].join(" · ");
+}
+
+function updateConditionIndexes() {
+  const cards = conditionCards();
+  cards.forEach((conditionCard, index) => {
+    const number = index + 1;
+    const numberText = String(number).padStart(2, "0");
+    const body = conditionCard.querySelector('[data-role="condition-body"]');
+    const toggle = conditionCard.querySelector('[data-role="condition-toggle"]');
+    const remove = conditionCard.querySelector('[data-role="condition-remove"]');
+    body.id = `condition-body-${conditionCard.dataset.conditionId}`;
+    toggle.setAttribute("aria-controls", body.id);
+    conditionCard.querySelector('[data-role="condition-number"]').textContent = numberText;
+    conditionCard.querySelector('[data-role="condition-title"]').textContent = t("conditionTitle", {
+      number,
+    });
+    remove.setAttribute("aria-label", t("removeCondition", { number }));
+    remove.disabled = cards.length === 1;
+    conditionCard.querySelector('[data-role="latitude"]').name = `conditions[${index}][latitude]`;
+    conditionCard.querySelector('[data-role="longitude"]').name = `conditions[${index}][longitude]`;
+    conditionCard.querySelector('[data-role="max-distance"]').name =
+      `conditions[${index}][max_distance_km]`;
+    updateConditionSummary(conditionCard);
+  });
+  conditionCount.textContent = `${cards.length} / 10`;
+  addConditionButton.disabled = cards.length >= 10;
+  addConditionButton.setAttribute("aria-disabled", String(cards.length >= 10));
+}
+
+function createConditionCard(condition, { expanded = false } = {}) {
+  const normalized = normalizeCondition(condition);
+  const conditionId = String(state.nextConditionId++);
+  const fragment = conditionTemplate.content.cloneNode(true);
+  const conditionCard = fragment.querySelector(".condition-card");
+  conditionCard.dataset.conditionId = conditionId;
+  state.conditionCountries.set(conditionId, new Set(normalized.countries));
+  state.conditionEvents.set(conditionId, new Set(normalized.events));
+  state.conditionContinents.set(conditionId, new Set(normalized.continents));
+  conditionCard.querySelector('[data-role="latitude"]').value = normalized.latitude ?? "";
+  conditionCard.querySelector('[data-role="longitude"]').value = normalized.longitude ?? "";
+  conditionCard.querySelector('[data-role="max-distance"]').value =
+    normalized.max_distance_km ?? "";
+  translateWithin(conditionCard);
+  renderConditionOptions(conditionCard, normalized);
+  setConditionExpanded(conditionCard, expanded);
+  return conditionCard;
+}
+
+function renderConditions(conditions) {
+  const normalizedConditions = (Array.isArray(conditions) && conditions.length
+    ? conditions
+    : [emptyCondition()]
+  ).slice(0, 10);
+  state.conditionCountries.clear();
+  state.conditionEvents.clear();
+  state.conditionContinents.clear();
+  state.nextConditionId = 1;
+  state.activeLocationConditionId = null;
+  conditionList.replaceChildren(
+    ...normalizedConditions.map((condition, index) =>
+      createConditionCard(condition, { expanded: index === 0 }),
+    ),
+  );
+  updateConditionIndexes();
+  applyMapProviderCopy();
+}
+
+function addCondition() {
+  const cards = conditionCards();
+  if (cards.length >= 10) {
+    showTranslationToast("conditionLimitReached", true);
+    return;
+  }
+  cards.forEach((conditionCard) => setConditionExpanded(conditionCard, false));
+  const conditionCard = createConditionCard(emptyCondition(), { expanded: true });
+  conditionList.append(conditionCard);
+  updateConditionIndexes();
+  applyMapProviderCopy();
+  conditionCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  conditionCard.querySelector('[data-role="condition-toggle"]').focus();
+}
+
+function removeCondition(conditionCard) {
+  const cards = conditionCards();
+  if (cards.length === 1) return;
+  const index = cards.indexOf(conditionCard);
+  const wasExpanded = !conditionCard.classList.contains("is-collapsed");
+  state.conditionCountries.delete(conditionCard.dataset.conditionId);
+  state.conditionEvents.delete(conditionCard.dataset.conditionId);
+  state.conditionContinents.delete(conditionCard.dataset.conditionId);
+  conditionCard.remove();
+  const remaining = conditionCards();
+  if (wasExpanded) setConditionExpanded(remaining[Math.min(index, remaining.length - 1)], true);
+  updateConditionIndexes();
+}
+
+function renderOptions() {
+  conditionCards().forEach((conditionCard) => {
+    translateWithin(conditionCard);
+    renderConditionOptions(conditionCard);
+    updateConditionSummary(conditionCard);
+  });
+  updateConditionIndexes();
+  applyMapProviderCopy();
 }
 
 async function loadOptions() {
@@ -1602,14 +1881,25 @@ async function loadOptions() {
   renderOptions();
 }
 
-function selectedValues(name) {
-  return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(
-    (input) => input.value,
-  );
-}
-
 function optionalNumber(input) {
   return input.value.trim() === "" ? null : Number(input.value);
+}
+
+function collectCondition(conditionCard) {
+  return {
+    latitude: optionalNumber(conditionCard.querySelector('[data-role="latitude"]')),
+    longitude: optionalNumber(conditionCard.querySelector('[data-role="longitude"]')),
+    max_distance_km: optionalNumber(
+      conditionCard.querySelector('[data-role="max-distance"]'),
+    ),
+    events: checkedValues(conditionCard.querySelector('[data-role="event-options"]')),
+    countries: [
+      ...(state.conditionCountries.get(conditionCard.dataset.conditionId) || new Set()),
+    ],
+    continents: checkedValues(
+      conditionCard.querySelector('[data-role="continent-options"]'),
+    ),
+  };
 }
 
 function collectPayload() {
@@ -1618,12 +1908,7 @@ function collectPayload() {
     return payload;
   }
   payload.name = nameInput.value.trim();
-  payload.latitude = optionalNumber(latitudeInput);
-  payload.longitude = optionalNumber(longitudeInput);
-  payload.max_distance_km = optionalNumber(maxDistanceInput);
-  payload.events = selectedValues("events");
-  payload.countries = [...state.selectedCountries];
-  payload.continents = selectedValues("continents");
+  payload.conditions = conditionCards().map(collectCondition);
   if (state.mode === "register") {
     payload.verification_code = verificationCodeInput.value.trim();
     payload.notification_consent = notificationConsentInput.checked;
@@ -1655,43 +1940,57 @@ function validatePayload(payload) {
     return false;
   }
 
-  const latitudeMissing = payload.latitude === null;
-  const longitudeMissing = payload.longitude === null;
-  if (latitudeMissing !== longitudeMissing) {
-    latitudeInput.setAttribute("aria-invalid", "true");
-    longitudeInput.setAttribute("aria-invalid", "true");
-    showTranslationToast("coordinatesTogether", true);
-    (latitudeMissing ? latitudeInput : longitudeInput).focus();
-    return false;
-  }
-  if (!latitudeMissing && (!Number.isFinite(payload.latitude) || payload.latitude < -90 || payload.latitude > 90)) {
-    latitudeInput.setAttribute("aria-invalid", "true");
-    showTranslationToast("latitudeRange", true);
-    latitudeInput.focus();
-    return false;
-  }
-  if (!longitudeMissing && (!Number.isFinite(payload.longitude) || payload.longitude < -180 || payload.longitude > 180)) {
-    longitudeInput.setAttribute("aria-invalid", "true");
-    showTranslationToast("longitudeRange", true);
-    longitudeInput.focus();
-    return false;
-  }
-  if (
-    payload.max_distance_km !== null &&
-    (!Number.isFinite(payload.max_distance_km) || payload.max_distance_km <= 0)
-  ) {
-    maxDistanceInput.setAttribute("aria-invalid", "true");
-    showTranslationToast("distancePositive", true);
-    maxDistanceInput.focus();
-    return false;
-  }
-  if (payload.max_distance_km !== null && latitudeMissing) {
-    latitudeInput.setAttribute("aria-invalid", "true");
-    longitudeInput.setAttribute("aria-invalid", "true");
-    maxDistanceInput.setAttribute("aria-invalid", "true");
-    showTranslationToast("distanceNeedsCoordinates", true);
-    latitudeInput.focus();
-    return false;
+  const cards = conditionCards();
+  for (const [index, condition] of payload.conditions.entries()) {
+    const conditionCard = cards[index];
+    const latitudeInput = conditionCard.querySelector('[data-role="latitude"]');
+    const longitudeInput = conditionCard.querySelector('[data-role="longitude"]');
+    const maxDistanceInput = conditionCard.querySelector('[data-role="max-distance"]');
+    const latitudeMissing = condition.latitude === null;
+    const longitudeMissing = condition.longitude === null;
+    const invalidate = (key, inputs, focusInput) => {
+      conditionCards().forEach((card) => setConditionExpanded(card, card === conditionCard));
+      conditionCard.classList.add("has-error");
+      inputs.forEach((input) => input.setAttribute("aria-invalid", "true"));
+      const messageFactory = () => `${t("conditionTitle", { number: index + 1 })}: ${t(key)}`;
+      showToast(messageFactory(), true, messageFactory);
+      focusInput.focus();
+      return false;
+    };
+    if (latitudeMissing !== longitudeMissing) {
+      return invalidate(
+        "coordinatesTogether",
+        [latitudeInput, longitudeInput],
+        latitudeMissing ? latitudeInput : longitudeInput,
+      );
+    }
+    if (
+      !latitudeMissing &&
+      (!Number.isFinite(condition.latitude) || condition.latitude < -90 || condition.latitude > 90)
+    ) {
+      return invalidate("latitudeRange", [latitudeInput], latitudeInput);
+    }
+    if (
+      !longitudeMissing &&
+      (!Number.isFinite(condition.longitude) ||
+        condition.longitude < -180 ||
+        condition.longitude > 180)
+    ) {
+      return invalidate("longitudeRange", [longitudeInput], longitudeInput);
+    }
+    if (
+      condition.max_distance_km !== null &&
+      (!Number.isFinite(condition.max_distance_km) || condition.max_distance_km <= 0)
+    ) {
+      return invalidate("distancePositive", [maxDistanceInput], maxDistanceInput);
+    }
+    if (condition.max_distance_km !== null && latitudeMissing) {
+      return invalidate(
+        "distanceNeedsCoordinates",
+        [latitudeInput, longitudeInput, maxDistanceInput],
+        latitudeInput,
+      );
+    }
   }
   if (state.mode === "register" && !/^\d{6}$/.test(payload.verification_code)) {
     verificationCodeInput.setAttribute("aria-invalid", "true");
@@ -1733,19 +2032,19 @@ async function requestSubscription(method, payload) {
 function populateSubscription(subscription) {
   emailInput.value = subscription.email || "";
   nameInput.value = subscription.name || "";
-  latitudeInput.value = subscription.latitude ?? "";
-  longitudeInput.value = subscription.longitude ?? "";
-  maxDistanceInput.value = subscription.max_distance_km ?? "";
-  state.selectedCountries = new Set(subscription.countries || []);
-  countrySearch.value = "";
-  document.querySelectorAll('input[name="events"]').forEach((input) => {
-    input.checked = Array.isArray(subscription.events) && subscription.events.includes(input.value);
-  });
-  document.querySelectorAll('input[name="continents"]').forEach((input) => {
-    input.checked =
-      Array.isArray(subscription.continents) && subscription.continents.includes(input.value);
-  });
-  renderCountries();
+  const legacyCondition = {
+    latitude: subscription.latitude,
+    longitude: subscription.longitude,
+    max_distance_km: subscription.max_distance_km,
+    events: subscription.events,
+    countries: subscription.countries,
+    continents: subscription.continents,
+  };
+  renderConditions(
+    Array.isArray(subscription.conditions) && subscription.conditions.length
+      ? subscription.conditions
+      : [legacyCondition],
+  );
 }
 
 function showLoadedSubscription(subscription) {
@@ -1935,7 +2234,62 @@ function bindEvents() {
   form.addEventListener("submit", submitForm);
   resetButton.addEventListener("click", resetForm);
   sendCodeButton.addEventListener("click", sendVerificationCode);
-  locationPickerButton.addEventListener("click", () => void openLocationDialog());
+  addConditionButton.addEventListener("click", addCondition);
+  conditionList.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const conditionCard = event.target.closest(".condition-card");
+    if (!conditionCard) return;
+    if (event.target.closest('[data-role="condition-toggle"]')) {
+      const shouldExpand = conditionCard.classList.contains("is-collapsed");
+      conditionCards().forEach((card) => {
+        setConditionExpanded(card, shouldExpand && card === conditionCard);
+      });
+      return;
+    }
+    if (event.target.closest('[data-role="condition-remove"]')) {
+      removeCondition(conditionCard);
+      return;
+    }
+    if (event.target.closest('[data-role="location-picker"]')) {
+      void openLocationDialog(conditionCard);
+    }
+  });
+  conditionList.addEventListener("input", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const conditionCard = event.target.closest(".condition-card");
+    if (!conditionCard) return;
+    if (event.target.matches('[data-role="country-search"]')) {
+      renderCountries(conditionCard);
+      return;
+    }
+    updateConditionSummary(conditionCard);
+  });
+  conditionList.addEventListener("change", (event) => {
+    const conditionCard = event.target.closest(".condition-card");
+    if (!conditionCard || !(event.target instanceof HTMLInputElement)) return;
+    const countryOptions = event.target.closest('[data-role="country-options"]');
+    if (countryOptions) {
+      const selectedCountries =
+        state.conditionCountries.get(conditionCard.dataset.conditionId) || new Set();
+      if (event.target.checked) selectedCountries.add(event.target.value);
+      else selectedCountries.delete(event.target.value);
+      state.conditionCountries.set(conditionCard.dataset.conditionId, selectedCountries);
+      updateCountryCount(conditionCard);
+    }
+    if (event.target.closest('[data-role="event-options"]')) {
+      state.conditionEvents.set(
+        conditionCard.dataset.conditionId,
+        new Set(checkedValues(conditionCard.querySelector('[data-role="event-options"]'))),
+      );
+    }
+    if (event.target.closest('[data-role="continent-options"]')) {
+      state.conditionContinents.set(
+        conditionCard.dataset.conditionId,
+        new Set(checkedValues(conditionCard.querySelector('[data-role="continent-options"]'))),
+      );
+    }
+    updateConditionSummary(conditionCard);
+  });
   locationDialogClose.addEventListener("click", closeLocationDialog);
   locationDialogCancel.addEventListener("click", closeLocationDialog);
   locationDialogConfirm.addEventListener("click", confirmLocationSelection);
@@ -1948,6 +2302,7 @@ function bindEvents() {
     activeMapProvider = null;
     pendingLocation = null;
     pendingProviderLocation = null;
+    state.activeLocationConditionId = null;
     applyMapProviderCopy();
     updateLocationSelectionDisplay();
   });
@@ -1963,17 +2318,10 @@ function bindEvents() {
       verificationCodeInput.value = "";
     }
   });
-  countrySearch.addEventListener("input", () => renderCountries());
-  countryOptions.addEventListener("change", (event) => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement) || input.name !== "countries") return;
-    if (input.checked) state.selectedCountries.add(input.value);
-    else state.selectedCountries.delete(input.value);
-    updateCountryCount();
-  });
 }
 
 bindEvents();
+renderConditions([emptyCondition()]);
 applyLanguage(state.language, { persist: false });
 setMode("register");
 try {

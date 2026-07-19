@@ -930,6 +930,29 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                         if recipient.continent_names is not None
                         else None
                     ),
+                    "conditions": [
+                        {
+                            "latitude": condition.latitude,
+                            "longitude": condition.longitude,
+                            "max_distance_km": condition.max_distance_km,
+                            "events": (
+                                sorted(condition.event_ids)
+                                if condition.event_ids is not None
+                                else None
+                            ),
+                            "countries": (
+                                sorted(condition.country_names)
+                                if condition.country_names is not None
+                                else None
+                            ),
+                            "continents": (
+                                sorted(condition.continent_names)
+                                if condition.continent_names is not None
+                                else None
+                            ),
+                        }
+                        for condition in recipient.conditions
+                    ],
                     "effective": recipient.email not in managed_emails,
                 }
             )
@@ -967,6 +990,7 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             "continents": (
                 list(subscription.continents) if subscription.continents is not None else None
             ),
+            "conditions": subscription.to_dict()["conditions"],
             "active": subscription.active,
             "updated_at": subscription.updated_at.isoformat(),
             "cancelled_at": (
@@ -1104,6 +1128,11 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
                 AMAP_SERVICE_HOST_PLACEHOLDER.encode("ascii"),
                 escape(self._settings.config.amap_service_host or "", quote=True).encode("utf-8"),
             )
+            if csp_nonce is None:
+                body = body.replace(
+                    f'<style nonce="{CSP_NONCE_PLACEHOLDER}"></style>'.encode("ascii"),
+                    b"",
+                )
             body = body.replace(
                 CSP_NONCE_PLACEHOLDER.encode("ascii"),
                 (csp_nonce or "").encode("ascii"),

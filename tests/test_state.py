@@ -19,9 +19,9 @@ from wca_competition_reminder.state import (
 )
 
 
-def downgrade_current_database_to_v3(path: Path) -> None:
+def downgrade_current_database_to_v4(path: Path) -> None:
     with sqlite3.connect(path) as connection:
-        connection.execute("ALTER TABLE subscribers DROP COLUMN max_distance_km")
+        connection.execute("DROP TABLE subscriber_conditions")
         connection.execute(f"PRAGMA user_version = {MIGRATABLE_SCHEMA_VERSION}")
 
 
@@ -50,7 +50,7 @@ def test_failed_transaction_rolls_back_and_connection_remains_reusable(
         assert state.counts() == {"competitions": 1}
 
 
-def test_current_schema_has_distance_filter_and_allows_empty_coordinates(tmp_path: Path) -> None:
+def test_current_schema_has_ordered_subscriber_conditions(tmp_path: Path) -> None:
     path = tmp_path / "state.sqlite3"
     with StateStore(path):
         pass
@@ -61,43 +61,73 @@ def test_current_schema_has_distance_filter_and_allows_empty_coordinates(tmp_pat
             for row in connection.execute("PRAGMA table_info(subscribers)").fetchall()
         }
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+        condition_columns = {
+            str(row[1])
+            for row in connection.execute("PRAGMA table_info(subscriber_conditions)").fetchall()
+        }
 
     assert "token_hash" not in subscriber_columns
     assert subscriber_columns["latitude"] == 0
     assert subscriber_columns["longitude"] == 0
     assert subscriber_columns["max_distance_km"] == 0
+    assert {
+        "subscriber_email",
+        "position",
+        "latitude",
+        "longitude",
+        "max_distance_km",
+        "event_ids_json",
+        "country_names_json",
+        "continent_names_json",
+    } <= condition_columns
     assert version == SCHEMA_VERSION
 
 
-def test_v3_schema_is_migrated_without_losing_state(tmp_path: Path) -> None:
+def test_v4_schema_is_fully_migrated_to_one_condition_without_losing_state(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "state.sqlite3"
     with StateStore(path) as state:
         state.register_subscriber(
-            RecipientConfig("legacy@example.com", 31.2304, 121.4737, "Legacy"),
+            RecipientConfig(
+                "legacy@example.com",
+                31.2304,
+                121.4737,
+                "Legacy",
+                event_ids=frozenset({"333"}),
+                country_names=frozenset({"China"}),
+                max_distance_km=300,
+            ),
             NOW,
         )
         state.initialize_baseline([make_summary("LegacyCompetition2026")], NOW)
-    downgrade_current_database_to_v3(path)
+    downgrade_current_database_to_v4(path)
 
     with StateStore(path) as state:
         subscriber = state.find_subscriber("legacy@example.com")
         assert subscriber is not None
         assert subscriber.name == "Legacy"
-        assert subscriber.max_distance_km is None
+        assert len(subscriber.conditions) == 1
+        assert subscriber.conditions[0].latitude == 31.2304
+        assert subscriber.conditions[0].max_distance_km == 300
+        assert subscriber.conditions[0].event_ids == frozenset({"333"})
+        assert subscriber.conditions[0].country_names == frozenset({"China"})
         assert state.counts() == {"competitions": 1}
 
     with sqlite3.connect(path) as connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(subscribers)")}
+        condition_count = int(
+            connection.execute("SELECT COUNT(*) FROM subscriber_conditions").fetchone()[0]
+        )
     assert version == SCHEMA_VERSION
-    assert "max_distance_km" in columns
+    assert condition_count == 1
 
 
-def test_concurrent_v3_open_only_migrates_once(tmp_path: Path) -> None:
+def test_concurrent_v4_open_only_migrates_once(tmp_path: Path) -> None:
     path = tmp_path / "state.sqlite3"
     with StateStore(path):
         pass
-    downgrade_current_database_to_v3(path)
+    downgrade_current_database_to_v4(path)
     barrier = Barrier(2)
 
     def open_store() -> int:
@@ -109,7 +139,7 @@ def test_concurrent_v3_open_only_migrates_once(tmp_path: Path) -> None:
         assert list(executor.map(lambda _index: open_store(), range(2))) == [0, 0]
 
 
-def test_malformed_v3_schema_is_rejected_without_partial_migration(tmp_path: Path) -> None:
+def test_malformed_v4_schema_is_rejected_without_partial_migration(tmp_path: Path) -> None:
     path = tmp_path / "state.sqlite3"
     with sqlite3.connect(path) as connection:
         connection.execute("CREATE TABLE subscribers (email TEXT PRIMARY KEY)")

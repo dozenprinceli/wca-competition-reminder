@@ -6,6 +6,7 @@ __pycache__/
 *.py[cod]
 *.sqlite3
 *.sqlite3-*
+*.sqlite3.*.bak
 config.toml
 smtp_password
 runner.lock
