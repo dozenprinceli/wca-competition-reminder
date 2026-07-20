@@ -24,6 +24,7 @@ from time import monotonic
 from typing import Any, Literal, cast
 from urllib.parse import parse_qs, urlsplit
 
+from wca_competition_reminder import __version__
 from wca_competition_reminder.config import AppConfig
 from wca_competition_reminder.events import OFFICIAL_EVENTS
 from wca_competition_reminder.mailer import DeliverySendError, SmtpMailer
@@ -53,6 +54,7 @@ ADMIN_LOGIN_ATTEMPTS = 5
 ADMIN_LOGIN_WINDOW_SECONDS = 5 * 60
 ADMIN_COOKIE_NAME = "wca_admin_session"
 APPLICATION_BASE_PATH_PLACEHOLDER = "__WCA_APPLICATION_BASE_PATH__"
+APPLICATION_VERSION_PLACEHOLDER = "__WCA_APPLICATION_VERSION__"
 GOOGLE_MAPS_API_KEY_PLACEHOLDER = "__WCA_GOOGLE_MAPS_API_KEY__"
 AMAP_API_KEY_PLACEHOLDER = "__WCA_AMAP_API_KEY__"
 AMAP_SECURITY_JS_CODE_PLACEHOLDER = "__WCA_AMAP_SECURITY_JS_CODE__"
@@ -405,7 +407,7 @@ class ReminderHttpServer(ThreadingHTTPServer):
 
 
 class ReminderRequestHandler(BaseHTTPRequestHandler):
-    server_version = "WcaCompetitionReminderWeb/0.1"
+    server_version = f"WcaCompetitionReminderWeb/{__version__}"
 
     @property
     def _settings(self) -> WebSettings:
@@ -1180,6 +1182,10 @@ class ReminderRequestHandler(BaseHTTPRequestHandler):
             body = body.replace(
                 APPLICATION_BASE_PATH_PLACEHOLDER.encode("ascii"),
                 self._application_base_path().encode("ascii"),
+            )
+            body = body.replace(
+                APPLICATION_VERSION_PLACEHOLDER.encode("ascii"),
+                escape(__version__).encode("ascii"),
             )
             body = body.replace(
                 GOOGLE_MAPS_API_KEY_PLACEHOLDER.encode("ascii"),

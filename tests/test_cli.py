@@ -1,6 +1,7 @@
 import io
 import logging
 import signal
+import tomllib
 from dataclasses import replace
 from pathlib import Path
 from threading import Event, Timer
@@ -8,7 +9,7 @@ from threading import Event, Timer
 import pytest
 
 from tests.conftest import make_config
-from wca_competition_reminder import cli
+from wca_competition_reminder import __version__, cli
 from wca_competition_reminder.config import ConfigurationError, RecipientConfig
 from wca_competition_reminder.locking import AlreadyRunningError, ProcessLock
 from wca_competition_reminder.mailer import DeliverySendError
@@ -57,6 +58,14 @@ def test_send_test_uses_dash_when_recipient_coordinates_are_missing(
 
 def test_parser_accepts_run_command() -> None:
     assert cli.build_parser().parse_args(["run"]).command == "run"
+
+
+def test_project_metadata_matches_runtime_version() -> None:
+    project = tomllib.loads(
+        (Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    )
+
+    assert project["project"]["version"] == __version__
 
 
 def test_logging_routes_levels_and_keeps_seven_daily_archives(

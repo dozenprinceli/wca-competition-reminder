@@ -8,7 +8,7 @@ from pathlib import Path
 from threading import Thread
 
 from tests.conftest import MutableClock, make_config
-from wca_competition_reminder import web
+from wca_competition_reminder import __version__, web
 from wca_competition_reminder.config import AdminConfig, RecipientConfig
 from wca_competition_reminder.state import StateStore
 
@@ -237,6 +237,8 @@ def test_forwarded_prefix_scopes_pages_and_admin_cookie(tmp_path: Path) -> None:
         assert "__WCA_AMAP_SECURITY_JS_CODE__" not in page
         assert "__WCA_AMAP_SERVICE_HOST__" not in page
         assert "__WCA_CSP_NONCE__" not in page
+        assert "__WCA_APPLICATION_VERSION__" not in page
+        assert f"REMINDER {__version__}" in page
         assert '<style nonce=""></style>' not in page
         assert page_response.getheader("Referrer-Policy") == "same-origin"
         content_security_policy = str(page_response.getheader("Content-Security-Policy"))
@@ -250,6 +252,8 @@ def test_forwarded_prefix_scopes_pages_and_admin_cookie(tmp_path: Path) -> None:
         admin_response = connection.getresponse()
         admin_page = admin_response.read().decode("utf-8")
         assert admin_response.status == 200
+        assert "__WCA_APPLICATION_VERSION__" not in admin_page
+        assert f"REMINDER {__version__}" in admin_page
         assert 'href="/wca-competition-reminder/admin.css"' in admin_page
         assert 'src="/wca-competition-reminder/admin.js"' in admin_page
         assert 'href="/wca-competition-reminder/"' in admin_page
