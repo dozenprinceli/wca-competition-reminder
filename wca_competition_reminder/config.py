@@ -19,6 +19,8 @@ from wca_competition_reminder.models import (
     normalize_notification_language,
 )
 
+DEFAULT_WEB_BASE_URL = "http://127.0.0.1:8080"
+
 
 class ConfigurationError(ValueError):
     pass
@@ -208,6 +210,7 @@ class AppConfig:
     smtp: SmtpConfig
     recipients: tuple[RecipientConfig, ...]
     admins: tuple[AdminConfig, ...] = ()
+    web_base_url: str = DEFAULT_WEB_BASE_URL
     google_maps_api_key: str | None = None
     amap_api_key: str | None = None
     amap_security_js_code: str | None = None
@@ -467,6 +470,28 @@ def load_config(path: Path) -> AppConfig:
     web_document = document.get("web", {})
     if not isinstance(web_document, dict):
         raise ConfigurationError("invalid [web] table")
+    web_base_url = _string(web_document, "base_url", DEFAULT_WEB_BASE_URL)
+    try:
+        parsed_web_base_url = urlsplit(web_base_url)
+        web_base_url_hostname = parsed_web_base_url.hostname
+        _ = parsed_web_base_url.port
+    except ValueError as exc:
+        raise ConfigurationError("web.base_url must be an absolute HTTP or HTTPS URL") from exc
+    if (
+        parsed_web_base_url.scheme not in {"http", "https"}
+        or not parsed_web_base_url.netloc
+        or web_base_url_hostname is None
+        or parsed_web_base_url.username is not None
+        or parsed_web_base_url.password is not None
+        or parsed_web_base_url.query
+        or parsed_web_base_url.fragment
+        or any(character.isspace() for character in web_base_url)
+    ):
+        raise ConfigurationError(
+            "web.base_url must be an absolute HTTP or HTTPS URL without credentials, "
+            "a query, or a fragment"
+        )
+    web_base_url = web_base_url.rstrip("/")
     google_maps_api_key = _optional_string(web_document, "google_maps_api_key")
     amap_api_key = _optional_string(web_document, "amap_api_key")
     amap_security_js_code = _optional_string(web_document, "amap_security_js_code")
@@ -596,6 +621,7 @@ def load_config(path: Path) -> AppConfig:
         smtp=smtp,
         recipients=tuple(recipients),
         admins=tuple(admins),
+        web_base_url=web_base_url,
         google_maps_api_key=google_maps_api_key,
         amap_api_key=amap_api_key,
         amap_security_js_code=amap_security_js_code,

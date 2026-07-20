@@ -13,3 +13,4 @@ runner.lock
 logs/
 .env
 tmp/
+AGENTS.md

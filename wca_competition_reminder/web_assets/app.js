@@ -517,6 +517,14 @@ const TRANSLATIONS = {
 const FALLBACK_EVENT_IDS = Object.keys(EVENT_LABELS);
 const STORAGE_KEY = "wca-reminder-email";
 const LANGUAGE_STORAGE_KEY = "wca-reminder-language";
+const TAB_TO_MODE = new Map([
+  ["register", "register"],
+  ["subscribe", "register"],
+  ["modify", "modify"],
+  ["edit", "modify"],
+  ["cancel", "cancel"],
+  ["unsubscribe", "cancel"],
+]);
 const MAP_PROVIDER_GOOGLE = "google";
 const MAP_PROVIDER_AMAP = "amap";
 const MAINLAND_CHINA_ADCODE_PREFIXES = new Set([
@@ -662,6 +670,16 @@ function initialLanguage() {
     // Continue with browser region detection when storage is unavailable.
   }
   return browserRegionLanguage();
+}
+
+function initialSubscriptionIntent() {
+  const query = new URLSearchParams(window.location.search);
+  const requestedTab = query.get("tab")?.trim().toLowerCase() || "";
+  const requestedEmail = query.get("email")?.trim() || "";
+  return {
+    mode: TAB_TO_MODE.get(requestedTab) || "register",
+    email: requestedEmail.length <= 254 ? requestedEmail : "",
+  };
 }
 
 const state = {
@@ -1577,7 +1595,11 @@ function setMode(mode) {
   if (mode === "cancel") preferences.classList.add("is-hidden");
 
   if (mode !== "register" && !emailInput.value) {
-    emailInput.value = window.localStorage.getItem(STORAGE_KEY) || "";
+    try {
+      emailInput.value = window.localStorage.getItem(STORAGE_KEY) || "";
+    } catch (_error) {
+      emailInput.value = "";
+    }
   }
   setNotificationLanguageDefault();
 }
@@ -2367,11 +2389,15 @@ function bindEvents() {
 bindEvents();
 renderConditions([emptyCondition()]);
 applyLanguage(state.language, { persist: false });
-setMode("register");
-try {
-  emailInput.value = window.localStorage.getItem(STORAGE_KEY) || "";
-} catch (_error) {
-  emailInput.value = "";
+const initialSubscription = initialSubscriptionIntent();
+emailInput.value = initialSubscription.email;
+setMode(initialSubscription.mode);
+if (!emailInput.value) {
+  try {
+    emailInput.value = window.localStorage.getItem(STORAGE_KEY) || "";
+  } catch (_error) {
+    emailInput.value = "";
+  }
 }
 updateClock();
 window.setInterval(updateClock, 1000);

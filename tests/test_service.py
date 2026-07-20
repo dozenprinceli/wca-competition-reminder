@@ -779,6 +779,7 @@ def test_expired_delivery_claim_cannot_be_completed_by_old_owner(tmp_path: Path)
         details,
         config.recipients[:1],
         from_address=config.smtp.from_address,
+        subscription_base_url=config.web_base_url,
         distance_available=True,
     )
 

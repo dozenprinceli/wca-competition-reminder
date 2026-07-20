@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import html
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from wca_competition_reminder.config import RecipientConfig
 from wca_competition_reminder.distance import coordinates_are_valid, haversine_km
@@ -92,11 +92,17 @@ def _escape_values(values: dict[str, str]) -> dict[str, str]:
     return {key: html.escape(value, quote=True) for key, value in values.items()}
 
 
+def _subscription_url(base_url: str, tab: str, recipient_email: str) -> str:
+    query = urlencode({"tab": tab, "email": recipient_email})
+    return f"{base_url.rstrip('/')}/?{query}"
+
+
 def build_delivery_drafts(
     details: CompetitionDetails,
     recipients: tuple[RecipientConfig, ...],
     *,
     from_address: str,
+    subscription_base_url: str,
     distance_available: bool,
     template_catalog: EmailTemplateCatalog | None = None,
     templates_path: Path | None = None,
@@ -187,6 +193,12 @@ def build_delivery_drafts(
             "distance": distance_text,
             "announced_at": details.announced_at.isoformat(),
             "competition_url": details.url,
+            "modify_subscription_url": _subscription_url(
+                subscription_base_url, "modify", recipient.email
+            ),
+            "cancel_subscription_url": _subscription_url(
+                subscription_base_url, "cancel", recipient.email
+            ),
             "venue_details_line": venue_details_line,
             "venue_details_html": venue_details_html,
         }

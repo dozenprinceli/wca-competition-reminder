@@ -110,6 +110,12 @@ Japanese subject, plain-text, and HTML templates for notifications and verificat
 TOML-managed recipients can set `notification_language` to `zh`, `en`, or `ja`; omitted values
 use Chinese.
 
+`web.base_url` is the public root URL of the browser subscription desk used by the edit and
+unsubscribe links at the bottom of notification emails. It defaults to
+`http://127.0.0.1:8080` for local development. Set it to the public HTTPS URL in production;
+include the reverse-proxy path when the desk is mounted below the domain root. The value must
+not contain credentials, a query string, or a fragment.
+
 ### 3. Provide the SMTP password
 
 For an interactive shell, use the environment variable named by `smtp.password_env` (the
@@ -160,6 +166,11 @@ only subscription identifier: current settings, updates, and cancellation do not
 Recipient coordinates are optional and must either both be set or both be empty. An optional
 positive maximum distance requires coordinates. Cancellation blocks pending deliveries for
 that address. Changes apply to competitions that have not already been queued.
+
+Links can open a specific form tab and prefill its email field with
+`?tab=modify&email=user%40example.com` or `?tab=cancel&email=user%40example.com`. The aliases
+`edit` and `unsubscribe` are also accepted. Opening a cancellation link only selects the tab and
+prefills the address; the user must still submit the form to cancel.
 
 The coordinate fields use the configured map provider to fill both coordinates to six decimal
 places. When both providers are available, the browser first uses its explicit region/time zone,

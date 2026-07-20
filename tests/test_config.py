@@ -60,6 +60,7 @@ continents = ["Europe"]
     assert config.wca.page_size == 100
     assert config.log_dir == (tmp_path / "logs").resolve()
     assert config.email_templates_path == (tmp_path / "config/email_templates.toml").resolve()
+    assert config.web_base_url == "http://127.0.0.1:8080"
     assert config.google_maps_api_key is None
     assert config.amap_api_key is None
     assert config.amap_security_js_code is None
@@ -172,6 +173,41 @@ google_maps_api_key = "  browser-test-key  "
     config = load_config(config_path)
 
     assert config.google_maps_api_key == "browser-test-key"
+
+
+def test_load_config_reads_and_normalizes_web_base_url(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(
+        config_path,
+        """
+[web]
+base_url = "  https://alerts.example.com/wca-reminder///  "
+""",
+    )
+
+    assert load_config(config_path).web_base_url == "https://alerts.example.com/wca-reminder"
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "alerts.example.com",
+        "ftp://alerts.example.com",
+        "https://user:secret@alerts.example.com",
+        "https://alerts.example.com/?source=email",
+        "https://alerts.example.com/#subscriptions",
+        "https://alerts.example.com:invalid",
+    ],
+)
+def test_web_base_url_must_be_a_clean_absolute_http_url(
+    tmp_path: Path,
+    base_url: str,
+) -> None:
+    config_path = tmp_path / "config.toml"
+    write_config(config_path, f'[web]\nbase_url = "{base_url}"')
+
+    with pytest.raises(ConfigurationError, match=r"web\.base_url"):
+        load_config(config_path)
 
 
 def test_google_maps_api_key_must_be_a_string(tmp_path: Path) -> None:

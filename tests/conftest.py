@@ -117,6 +117,7 @@ def make_config(
             timeout_seconds=1,
             password_env="TEST_SMTP_PASSWORD",
         ),
+        web_base_url="https://reminder.test/subscriptions",
         recipients=(
             RecipientConfig("one@example.com", 31.2304, 121.4737, "One"),
             RecipientConfig("two@example.com", 39.9042, 116.4074, "Two"),

@@ -268,6 +268,7 @@ class ReminderService:
                 details,
                 matched_recipients,
                 from_address=self._config.smtp.from_address,
+                subscription_base_url=self._config.web_base_url,
                 distance_available=coordinates_valid,
                 template_catalog=self._template_catalog,
                 templates_path=self._config.email_templates_path,

@@ -15,6 +15,7 @@ def populate_database(tmp_path: Path):
         details,
         config.recipients[:1],
         from_address=config.smtp.from_address,
+        subscription_base_url=config.web_base_url,
         distance_available=True,
     )
     with StateStore(config.state_path) as state:

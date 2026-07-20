@@ -9,6 +9,9 @@ max_emails_per_run = 100
 email_templates_path = "config/email_templates.toml"
 
 [web]
+# Public subscription desk root used by the email's edit and unsubscribe links.
+# Include a reverse-proxy path here when the app is mounted below the domain root.
+base_url = "http://127.0.0.1:8080"
 # Optional: enables the Google Maps location picker in the browser subscription form.
 # Browser API keys are public; restrict this key by HTTP referrer and to Maps JavaScript API.
 google_maps_api_key = ""
